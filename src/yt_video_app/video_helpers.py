@@ -21,7 +21,7 @@ logger = logging.getLogger("video_helpers")
 
 def get_downloads_directory(config: Optional[Dict[str, Any]] = None) -> Path:
     """
-    Get the configured downloads directory.
+    Get the configured downloads directory for video files.
 
     Args:
         config: Configuration dictionary (loads from Python module if None)
@@ -34,9 +34,11 @@ def get_downloads_directory(config: Optional[Dict[str, Any]] = None) -> Path:
     else:
         download_path = config.get("download", {}).get("download_path", "downloads")
     
-    logger.debug(f"Using download path: {download_path}")
+    # Add video subdirectory
+    video_path = f"{download_path}/video"
+    logger.debug(f"Using video download path: {video_path}")
     _, base_dir = get_script_directories()
-    return resolve_path(download_path, base_dir)
+    return resolve_path(video_path, base_dir)
 
 
 def get_default_video_settings(config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:

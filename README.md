@@ -12,6 +12,7 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 - **Simple CLI**: Just URL and basic options
 - **Fast & Reliable**: Minimal dependencies, focused functionality
 - **No Config Files**: Everything is hardcoded for simplicity
+- **Organized Output**: Downloads to `downloads/audio/` directory
 
 ### Video Downloader (`yt_video_app`)
 - **Configurable Quality**: Choose from best, 2160p, 1440p, 1080p, 720p, 480p, 360p, 144p
@@ -19,6 +20,7 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 - **Container Compatibility**: Enforces container-compatible tracks to avoid FFmpeg errors
 - **Configuration-Driven**: Python-based configuration for easy customization
 - **Comprehensive Logging**: Centralized logging with hybrid approach
+- **Organized Output**: Downloads to `downloads/video/` directory
 
 ### Shared Features
 - **Modular Design**: Clean separation of concerns
@@ -149,6 +151,9 @@ my_project/
 │       ├── app_config.py       # Video app configuration
 │       └── logging_config.py   # Shared logging configuration
 ├── path_utils/                 # Shared path utilities
+├── downloads/                  # Download directories
+│   ├── audio/                  # Audio downloads (MP3 files)
+│   └── video/                  # Video downloads (MP4/WebM files)
 ├── tests/
 │   ├── test_audio_app/         # Audio app tests
 │   │   ├── test_audio_core.py
@@ -235,7 +240,7 @@ logs/
 ### Audio Download Examples
 
 ```bash
-# Download a song as MP3
+# Download a song as MP3 (saves to downloads/audio/)
 python -m src.yt_audio_app "https://youtu.be/dQw4w9WgXcQ"
 
 # Download to custom directory
@@ -251,7 +256,7 @@ python -m src.yt_audio_app "URL" --metadata
 ### Video Download Examples
 
 ```bash
-# Download best available quality
+# Download best available quality (saves to downloads/video/)
 python -m src.yt_video_app "https://youtu.be/dQw4w9WgXcQ"
 
 # Download 1080p MP4
