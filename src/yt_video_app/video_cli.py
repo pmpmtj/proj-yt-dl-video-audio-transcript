@@ -1,9 +1,9 @@
-# my_project/src/yt_dl_app/yt_dl_core_CLI.py
+# my_project/src/yt_video_app/video_cli.py
 """
-CLI interface for YouTube downloader.
+CLI interface for YouTube video downloader.
 
 This module contains CLI-specific functionality including argument parsing
-and the CLI controller. It imports and uses the core business logic.
+and the CLI controller. It imports and uses the core video business logic.
 """
 
 import argparse
@@ -12,30 +12,29 @@ import logging
 from typing import Optional, Dict, Any, Callable
 import yt_dlp
 
-# Import core business logic functions
-from src.yt_dl_app.yt_dl_core import (
-    download_audio_mp3, 
+# Import core video business logic functions
+from .video_core import (
     download_video_with_audio,
-    default_progress_hook
+    default_video_progress_hook
 )
 
 # Import configuration utilities
 from path_utils import load_config
-from src.yt_dl_app.yt_dl_helpers import get_default_video_settings
+from .video_helpers import get_default_video_settings
 
 # Initialize logger for this module
-logger = logging.getLogger("yt_dl_cli")
+logger = logging.getLogger("video_cli")
 
 
 # --- CLI Functions -------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    """Parse command line arguments for the YouTube downloader CLI with config defaults.
+    """Parse command line arguments for the YouTube video downloader CLI with config defaults.
     
     Returns:
         Parsed arguments namespace
     """
-    logger.debug("Parsing command line arguments")
+    logger.debug("Parsing command line arguments for video downloader")
     
     # Load config for defaults
     try:
@@ -52,9 +51,18 @@ def parse_args() -> argparse.Namespace:
             'restrict_filenames': False
         }
     
-    p = argparse.ArgumentParser(description='Simple yt-dlp downloader (audio MP3 or video+audio).')
-    p.add_argument('url', help='Video URL (positional)')
-    p.add_argument('--audio-only', action='store_true', help='Download audio only (MP3).')
+    p = argparse.ArgumentParser(
+        description='YouTube video downloader with configurable quality and format options.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python -m src.yt_video_app "https://www.youtube.com/watch?v=VIDEO_ID"
+  python -m src.yt_video_app "URL" --quality 1080p --ext mp4
+  python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
+  python -m src.yt_video_app "URL" --ext webm --quality 720p
+        """
+    )
+    p.add_argument('url', help='YouTube video URL to download')
     p.add_argument('--output-template', default=video_settings['output_template'], 
                    help=f'yt-dlp output template (default: {video_settings["output_template"].replace("%", "%%")})')
     p.add_argument('--restrict-filenames', action='store_true', 
@@ -67,33 +75,30 @@ def parse_args() -> argparse.Namespace:
                    help=f'Target video quality (cap). Default: {video_settings["quality"]}.')
     
     args = p.parse_args()
-    logger.info(f"Parsed arguments: URL={args.url}, audio_only={args.audio_only}, ext={args.ext}, quality={args.quality}")
+    logger.info(f"Parsed arguments: URL={args.url}, ext={args.ext}, quality={args.quality}")
     return args
 
 
-class CLIController:
-    """Controller class for CLI operations with dependency injection for testing."""
+class VideoCLIController:
+    """Controller class for video CLI operations with dependency injection for testing."""
     
     def __init__(self, 
                  config_loader: Optional[Callable] = None,
                  video_settings_loader: Optional[Callable] = None,
-                 audio_downloader: Optional[Callable] = None,
                  video_downloader: Optional[Callable] = None,
                  progress_hook: Optional[Callable] = None):
-        """Initialize CLI controller with optional dependencies for testing.
+        """Initialize video CLI controller with optional dependencies for testing.
         
         Args:
             config_loader: Function to load configuration (defaults to load_config)
             video_settings_loader: Function to load video settings (defaults to get_default_video_settings)
-            audio_downloader: Function to download audio (defaults to download_audio_mp3)
             video_downloader: Function to download video (defaults to download_video_with_audio)
-            progress_hook: Progress callback function (defaults to default_progress_hook)
+            progress_hook: Progress callback function (defaults to default_video_progress_hook)
         """
         self.config_loader = config_loader or load_config
         self.video_settings_loader = video_settings_loader or get_default_video_settings
-        self.audio_downloader = audio_downloader or download_audio_mp3
         self.video_downloader = video_downloader or download_video_with_audio
-        self.progress_hook = progress_hook or default_progress_hook
+        self.progress_hook = progress_hook or default_video_progress_hook
     
     def load_configuration(self) -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
         """Load configuration and video settings.
@@ -125,29 +130,6 @@ class CLIController:
             return None
         return args_output_template
     
-    def handle_audio_download(self, url: str, output_template: Optional[str], 
-                            restrict_filenames: bool, config: Optional[Dict[str, Any]]) -> str:
-        """Handle audio download workflow.
-        
-        Args:
-            url: Video URL to download
-            output_template: Output template for filename
-            restrict_filenames: Whether to restrict filenames to ASCII
-            config: Configuration dictionary
-            
-        Returns:
-            Path to downloaded audio file
-        """
-        logger.info("Starting audio-only download")
-        path = self.audio_downloader(
-            url, 
-            output_template, 
-            restrict_filenames,
-            progress_callback=self.progress_hook,
-            config=config
-        )
-        logger.info(f"Audio download completed: {path}")
-        return path
     
     def handle_video_download(self, url: str, output_template: Optional[str], 
                             restrict_filenames: bool, ext: str, quality: str,
@@ -210,39 +192,30 @@ class CLIController:
         logger.debug(f"Using output template: {output_template or 'default'}")
         
         try:
-            if args.audio_only:
-                path = self.handle_audio_download(
-                    args.url, 
-                    output_template, 
-                    args.restrict_filenames,
-                    config
-                )
-                print(f"\nDone: {path}")
-            else:
-                path = self.handle_video_download(
-                    args.url, 
-                    output_template, 
-                    args.restrict_filenames, 
-                    args.ext, 
-                    args.quality,
-                    config
-                )
-                print(f"\nDone: {path or 'completed'}")
+            path = self.handle_video_download(
+                args.url, 
+                output_template, 
+                args.restrict_filenames, 
+                args.ext, 
+                args.quality,
+                config
+            )
+            print(f"\nVideo download completed: {path or 'failed'}")
         except Exception as e:
             self.handle_download_error(e)
             raise
 
 
 def main():
-    """Main CLI entry point with error handling.
+    """Main CLI entry point for video downloader with error handling.
     
     This function handles the CLI workflow and error handling,
     delegating the actual download logic to the core functions.
     """
-    logger.info("Starting CLI main function")
+    logger.info("Starting video CLI main function")
     args = parse_args()
     
-    controller = CLIController()
+    controller = VideoCLIController()
     controller.run(args)
 
 

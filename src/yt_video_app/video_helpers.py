@@ -1,8 +1,8 @@
-# my_project/src/yt_dl_app/yt_dl_helpers.py
+# my_project/src/yt_video_app/video_helpers.py
 """
-yt_dl_helpers.py
+video_helpers.py
 
-YouTube downloader specific helper functions for path and configuration management.
+YouTube video downloader specific helper functions for path and configuration management.
 """
 
 import logging
@@ -13,10 +13,10 @@ from typing import Union, Optional, Dict, Any
 from path_utils import resolve_path, ensure_directory, get_script_directories
 
 # Import the new Python configuration
-from src.common.app_config import get_config, get_download_config, get_video_config, get_download_path, get_video_settings
+from ..common.app_config import get_config, get_download_config, get_video_config, get_download_path, get_video_settings
 
 # Initialize logger for this module
-logger = logging.getLogger("yt_dl_helpers")
+logger = logging.getLogger("video_helpers")
 
 
 def get_downloads_directory(config: Optional[Dict[str, Any]] = None) -> Path:
@@ -59,8 +59,7 @@ def get_default_video_settings(config: Optional[Dict[str, Any]] = None) -> Dict[
         'ext': video_config.get('ext', 'mp4'),
         'quality': video_config.get('quality', 'best'),
         'output_template': video_config.get('output_template', '%(title)s.%(ext)s'),
-        'restrict_filenames': video_config.get('restrict_filenames', False),
-        'audio_only': video_config.get('audio_only', False)
+        'restrict_filenames': video_config.get('restrict_filenames', False)
     }
 
 

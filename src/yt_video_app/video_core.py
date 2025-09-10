@@ -1,9 +1,9 @@
-# my_project/src/yt_dl_app/yt_dl_core.py
 """
-Core business logic for YouTube downloader.
+Core business logic for YouTube video downloader.
 
-This module contains the core download functionality and metadata parsing.
+This module contains the core video download functionality and metadata parsing.
 It's designed to be independent of CLI or web interface concerns.
+Focuses solely on video downloads with configurable quality and format options.
 """
 
 import os
@@ -13,25 +13,25 @@ import yt_dlp
 
 # Import configuration utilities
 from path_utils import load_config
-from src.yt_dl_app.yt_dl_helpers import (
+from .video_helpers import (
     get_default_video_settings, 
     get_output_template_with_path,
     get_downloads_directory
 )
 
 # Initialize logger for this module
-logger = logging.getLogger("yt_dl_core")
+logger = logging.getLogger("video_core")
 
 
 # --- Progress Hook (Callback Interface) ----------------------------------------
 
-def default_progress_hook(d):
-    """Default progress hook that prints to console."""
+def default_video_progress_hook(d):
+    """Default progress hook for video downloads."""
     if d.get('status') == 'downloading':
         pct = (d.get('_percent_str') or '').strip()
-        print(f"\r{pct}", end='', flush=True)
+        print(f"\rDownloading video: {pct}", end='', flush=True)
     elif d.get('status') == 'finished':
-        print("\r100%    ")
+        print("\rVideo download: 100%    ")
 
 
 # --- Format Selection Logic ---------------------------------------------------
@@ -81,30 +81,6 @@ def _load_download_config(config: Optional[Dict[str, Any]] = None) -> Dict[str, 
     return config
 
 
-def _get_audio_download_settings(config: Dict[str, Any], outtmpl: Optional[str] = None, 
-                                restrict: Optional[bool] = None) -> Tuple[str, bool]:
-    """Get audio download settings from config and parameters.
-    
-    Args:
-        config: Configuration dictionary
-        outtmpl: Output template for filename (uses config default if None)
-        restrict: Whether to restrict filenames to ASCII (uses config default if None)
-        
-    Returns:
-        Tuple of (output_template, restrict_filenames)
-    """
-    if outtmpl is None:
-        outtmpl = get_output_template_with_path(config)
-        logger.debug(f"Using output template: {outtmpl}")
-    
-    if restrict is None:
-        video_settings = get_default_video_settings(config)
-        restrict = video_settings['restrict_filenames']
-        logger.debug(f"Using restrict filenames: {restrict}")
-    
-    return outtmpl, restrict
-
-
 def _get_video_download_settings(config: Dict[str, Any], outtmpl: Optional[str] = None, 
                                 restrict: Optional[bool] = None, ext: Optional[str] = None, 
                                 quality: Optional[str] = None) -> Tuple[str, bool, str, str]:
@@ -141,33 +117,6 @@ def _get_video_download_settings(config: Dict[str, Any], outtmpl: Optional[str] 
     return outtmpl, restrict, ext, quality
 
 
-def _create_audio_ydl_options(outtmpl: str, restrict: bool, 
-                             progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
-    """Create yt-dlp options for audio download.
-    
-    Args:
-        outtmpl: Output template for filename
-        restrict: Whether to restrict filenames to ASCII
-        progress_callback: Optional progress callback function
-        
-    Returns:
-        yt-dlp options dictionary
-    """
-    progress_hooks = [progress_callback] if progress_callback else [default_progress_hook]
-    
-    return {
-        'format': 'bestaudio/best',
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192',
-        }],
-        'outtmpl': outtmpl,
-        'restrictfilenames': restrict,
-        'progress_hooks': progress_hooks,
-        'quiet': False,
-        'no_warnings': False,
-    }
-
-
 def _create_video_ydl_options(outtmpl: str, restrict: bool, ext: str, quality: str,
                              progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """Create yt-dlp options for video download.
@@ -182,7 +131,7 @@ def _create_video_ydl_options(outtmpl: str, restrict: bool, ext: str, quality: s
     Returns:
         yt-dlp options dictionary
     """
-    progress_hooks = [progress_callback] if progress_callback else [default_progress_hook]
+    progress_hooks = [progress_callback] if progress_callback else [default_video_progress_hook]
     
     merge_ext = ext if ext in ('mp4', 'webm') else 'mp4'
     format_string = _fmt_for(merge_ext, quality)
@@ -205,7 +154,7 @@ def _extract_expected_filename(ydl, info: Dict[str, Any], file_extension: str) -
     Args:
         ydl: yt-dlp instance
         info: Video information dictionary
-        file_extension: Expected file extension (e.g., 'mp3', 'mp4')
+        file_extension: Expected file extension (e.g., 'mp4', 'webm')
         
     Returns:
         Expected file path
@@ -226,8 +175,8 @@ def _check_file_exists(expected_path: str, file_checker: Callable) -> bool:
     """
     exists = file_checker(expected_path)
     if exists:
-        logger.info(f"File already present: {expected_path}")
-        print(f"File already present: {expected_path}")
+        logger.info(f"Video file already present: {expected_path}")
+        print(f"Video file already present: {expected_path}")
     return exists
 
 
@@ -243,70 +192,18 @@ def _perform_download(ydl, url: str, expected_path: str, file_checker: Callable)
     Returns:
         True if download successful, False otherwise
     """
-    logger.info("Starting download...")
+    logger.info("Starting video download...")
     ydl.download([url])
     
     if file_checker(expected_path):
-        logger.info(f"Download completed: {expected_path}")
+        logger.info(f"Video download completed: {expected_path}")
         return True
     else:
-        logger.error(f"Download failed - file not found: {expected_path}")
+        logger.error(f"Video download failed - file not found: {expected_path}")
         return False
 
 
 # --- Core Download Functions --------------------------------------------------
-
-def download_audio_mp3(url: str, outtmpl: Optional[str] = None, restrict: Optional[bool] = None, 
-                      progress_callback: Optional[Callable] = None, 
-                      config: Optional[Dict[str, Any]] = None,
-                      downloader=None, file_checker=None) -> str:
-    """Download best audio → MP3. Returns final path.
-    
-    Args:
-        url: YouTube URL to download
-        outtmpl: Output template for filename (uses config default if None)
-        restrict: Whether to restrict filenames to ASCII (uses config default if None)
-        progress_callback: Optional progress callback function
-        config: Configuration dictionary (loads from file if None)
-        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
-        file_checker: Function to check if file exists (defaults to os.path.exists)
-        
-    Returns:
-        Path to downloaded MP3 file
-    """
-    logger.info(f"Starting audio download for URL: {url}")
-    
-    # Load configuration
-    config = _load_download_config(config)
-    
-    # Get download settings
-    outtmpl, restrict = _get_audio_download_settings(config, outtmpl, restrict)
-    
-    # Set up dependencies
-    if downloader is None:
-        downloader = yt_dlp.YoutubeDL
-    if file_checker is None:
-        file_checker = os.path.exists
-    
-    # Create yt-dlp options
-    ydl_opts = _create_audio_ydl_options(outtmpl, restrict, progress_callback)
-    logger.debug(f"yt-dlp options: {ydl_opts}")
-    
-    with downloader(ydl_opts) as ydl:
-        logger.info("Extracting video information...")
-        info = ydl.extract_info(url, download=False)
-        expected_path = _extract_expected_filename(ydl, info, 'mp3')
-        
-        # Check if file already exists
-        if _check_file_exists(expected_path, file_checker):
-            return expected_path
-        
-        # Perform download
-        if _perform_download(ydl, url, expected_path, file_checker):
-            return expected_path
-        else:
-            raise RuntimeError(f"Audio download failed - file not found: {expected_path}")
-
 
 def download_video_with_audio(url: str, outtmpl: Optional[str] = None, 
                             restrict: Optional[bool] = None, ext: Optional[str] = None, 
@@ -460,4 +357,3 @@ def extract_subtitle_languages(info: Dict[str, Any]) -> List[Dict[str, str]]:
             if isinstance(k, str):
                 keys.add(k.strip())
     return [{ 'code': k, 'label': _label_for_lang(k) } for k in sorted(keys)]
-

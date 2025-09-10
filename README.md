@@ -1,22 +1,36 @@
-# YouTube Downloader - Modular Python Package
+# YouTube Downloader - Separated Audio and Video Apps
 
-A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with a clean, production-ready architecture.
+A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, production-ready architecture. The project has been separated into two focused applications:
+
+- **Audio Downloader** (`yt_audio_app`): Simple, hardcoded MP3 downloads
+- **Video Downloader** (`yt_video_app`): Configurable video downloads with quality/format options
 
 ## Features
 
-* **Modular Design**: Separated core logic, CLI interface, and configuration
-* **Container Compatibility**: Enforces container-compatible tracks to avoid FFmpeg errors
-* **Quality Control**: Configurable quality caps and format selection
-* **Audio Support**: Download audio-only as MP3
-* **Configuration-Driven**: JSON-based configuration for easy customization
-* **Comprehensive Logging**: Centralized logging with hybrid approach (main log + specialized logs)
-* **Cross-Platform**: Works on Windows, macOS, and Linux
+### Audio Downloader (`yt_audio_app`)
+- **Hardcoded Settings**: MP3, 192kbps, no configuration needed
+- **Simple CLI**: Just URL and basic options
+- **Fast & Reliable**: Minimal dependencies, focused functionality
+- **No Config Files**: Everything is hardcoded for simplicity
+
+### Video Downloader (`yt_video_app`)
+- **Configurable Quality**: Choose from best, 2160p, 1440p, 1080p, 720p, 480p, 360p, 144p
+- **Multiple Formats**: MP4 and WebM container support
+- **Container Compatibility**: Enforces container-compatible tracks to avoid FFmpeg errors
+- **Configuration-Driven**: Python-based configuration for easy customization
+- **Comprehensive Logging**: Centralized logging with hybrid approach
+
+### Shared Features
+- **Modular Design**: Clean separation of concerns
+- **Cross-Platform**: Works on Windows, macOS, and Linux
+- **Comprehensive Testing**: Full test coverage for both apps
+- **Production-Ready**: Error handling, logging, and robust architecture
 
 ## Requirements
 
 * Python 3.8+
 * `pip install yt-dlp`
-* **FFmpeg** in PATH (needed for merging/remuxing)
+* **FFmpeg** in PATH (needed for video merging/remuxing)
 
 ## Installation
 
@@ -28,180 +42,174 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with a clean, prod
 
 ## Usage
 
-### As a Python Module (Recommended)
+### Audio Downloader
+
+Download audio only as MP3 with hardcoded settings (192kbps):
 
 ```bash
-python -m src.yt_dl_app "https://www.youtube.com/watch?v=VIDEO_ID" [options]
+# Basic audio download
+python -m src.yt_audio_app "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Custom output directory
+python -m src.yt_audio_app "URL" --output-dir ./music
+
+# Custom filename template
+python -m src.yt_audio_app "URL" --template "%(uploader)s - %(title)s.%(ext)s"
+
+# Show metadata without downloading
+python -m src.yt_audio_app "URL" --metadata
+
+# Quiet mode (no progress output)
+python -m src.yt_audio_app "URL" --quiet
 ```
 
-### As a Standalone Script (Alternative)
+### Video Downloader
+
+Download video with configurable quality and format:
 
 ```bash
-python src/yt_dl_app/__main__.py "https://www.youtube.com/watch?v=VIDEO_ID" [options]
-```
+# Basic video download (using config defaults)
+python -m src.yt_video_app "https://www.youtube.com/watch?v=VIDEO_ID"
 
-### Direct CLI Module Execution
+# Specific quality and format
+python -m src.yt_video_app "URL" --quality 1080p --ext mp4
 
-```bash
-python src/yt_dl_app/yt_dl_core_CLI.py "https://www.youtube.com/watch?v=VIDEO_ID" [options]
+# Custom filename template
+python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
+
+# WebM format at 720p
+python -m src.yt_video_app "URL" --ext webm --quality 720p
+
+# ASCII-only filenames (safer)
+python -m src.yt_video_app "URL" --restrict-filenames
 ```
 
 ### Command Line Options
 
+#### Audio Downloader Options
 * `url` *(positional)* — the video URL
-* `--audio-only` — download audio only (MP3)
-* `--output-template TEMPLATE` — yt-dlp output template (default: from config)
+* `--output-dir, -o` — output directory (default: ./downloads/audio)
+* `--template, -t` — filename template (default: %(title)s.%(ext)s)
+* `--metadata, -m` — show video metadata without downloading
+* `--quiet, -q` — suppress progress output
+
+#### Video Downloader Options
+* `url` *(positional)* — the video URL
+* `--output-template` — yt-dlp output template (default: from config)
 * `--restrict-filenames` — ASCII-only safe filenames
 * `--ext {mp4,webm}` — preferred output container (default: from config)
 * `--quality {best,2160p,1440p,1080p,720p,480p,360p,144p}` — video quality cap (default: from config)
 
-### Examples
-
-```bash
-# Best available MP4 (using config defaults)
-python -m src.yt_dl_app https://youtu.be/VIDEO_ID
-
-# MP4 at most 1080p
-python -m src.yt_dl_app https://youtu.be/VIDEO_ID --quality 1080p
-
-# WEBM at most 720p
-python -m src.yt_dl_app https://youtu.be/VIDEO_ID --ext webm --quality 720p
-
-# Audio only (best → MP3)
-python -m src.yt_dl_app https://youtu.be/VIDEO_ID --audio-only
-
-# Show help and available options
-python -m src.yt_dl_app --help
-
-# Alternative: Direct script execution
-python src/yt_dl_app/__main__.py https://youtu.be/VIDEO_ID --quality 720p
-
-# Alternative: Direct CLI module execution
-python src/yt_dl_app/yt_dl_core_CLI.py https://youtu.be/VIDEO_ID --audio-only
-```
-
 ## Configuration
 
-The application uses Python configuration modules:
+### Video Downloader Configuration
 
-* `src/common/app_config.py` - Main application settings (Python-based)
-* `src/common/logging_config.py` - Logging configuration (Python-based)
+The video downloader uses Python configuration in `src/common/app_config.py`:
 
-### Default Configuration
-
-#### Application Settings (`app_config.py`)
 ```python
 APP_CONFIG = {
     "download": {
-        "download_path": "./download"
+        "download_path": "./downloads"
     },
     "video": {
         "ext": "mp4",
-        "quality": "best",
+        "quality": "best", 
         "output_template": "%(title)s.%(ext)s",
-        "restrict_filenames": True,
-        "audio_only": False
+        "restrict_filenames": True
     }
 }
 ```
 
-#### Logging Configuration (`logging_config.py`)
-The logging configuration is now handled by a Python module that provides centralized logging setup:
+### Audio Downloader Configuration
 
-```python
-LOGGING_CONFIG = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
-        },
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'standard',
-        },
-        'rotating_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': str(LOG_DIR / 'app.log'),
-            'maxBytes': 1024 * 1024,  # 1MB
-            'backupCount': 5,
-            'formatter': 'standard',
-            'mode': 'a',
-        },
-        'error_file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'filename': str(LOG_DIR / 'error.log'),
-            'maxBytes': 512 * 1024,  # 512KB
-            'backupCount': 3,
-            'formatter': 'standard',
-            'mode': 'a',
-            'level': 'ERROR',
-        },
-    },
-    'root': {
-        'handlers': ['console', 'rotating_file', 'error_file'],
-        'level': 'INFO',
-    },
-}
-```
+The audio downloader has **hardcoded settings** for simplicity:
+- Format: `bestaudio/best`
+- Codec: `MP3`
+- Quality: `192kbps`
+- Filename restriction: `enabled`
 
 ## Project Structure
 
 ```
 my_project/
 ├── src/
-│   ├── yt_dl_app/
-│   │   ├── __init__.py          # Package initialization
-│   │   ├── __main__.py          # Package entry point
-│   │   ├── yt_dl_core.py        # Core business logic
-│   │   ├── yt_dl_core_CLI.py    # CLI interface
-│   │   └── yt_dl_helpers.py     # YTDL-specific helper functions
-│   └── common/
-│       ├── app_config.py        # Application configuration (Python)
-│       └── logging_config.py    # Logging configuration (Python)
-├── path_utils/
-│   ├── __init__.py              # Package initialization with clean exports
-│   └── path_utils.py            # Generic path and file utilities
-├── logs/                        # Log files directory
+│   ├── yt_audio_app/           # Audio downloader (hardcoded settings)
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── audio_core.py       # Audio download logic
+│   │   ├── audio_cli.py        # Audio CLI interface
+│   │   └── audio_helpers.py    # Audio-specific helpers
+│   ├── yt_video_app/           # Video downloader (configurable)
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── video_core.py       # Video download logic
+│   │   ├── video_cli.py        # Video CLI interface
+│   │   └── video_helpers.py    # Video-specific helpers
+│   └── common/                 # Shared utilities
+│       ├── app_config.py       # Video app configuration
+│       └── logging_config.py   # Shared logging configuration
+├── path_utils/                 # Shared path utilities
+├── tests/
+│   ├── test_audio_app/         # Audio app tests
+│   │   ├── test_audio_core.py
+│   │   ├── test_audio_cli.py
+│   │   └── test_audio_helpers.py
+│   ├── test_video_app/         # Video app tests
+│   │   ├── test_video_core.py
+│   │   ├── test_video_cli.py
+│   │   └── test_video_helpers.py
+│   └── test_path_utils.py      # Shared utility tests
 ├── requirements.txt
 └── README.md
 ```
 
 ## Architecture
 
-The application follows a clean, modular architecture designed for both CLI and server use:
+### Audio App Architecture
+- **Simple & Focused**: Hardcoded settings, minimal configuration
+- **Fast Execution**: No complex format selection or configuration loading
+- **Reliable**: Fewer moving parts, less chance of errors
+- **Easy to Use**: Just provide URL and optional output directory
 
-* **Core Logic** (`yt_dl_core.py`): Contains all business logic for downloading and metadata extraction
-* **CLI Interface** (`yt_dl_core_CLI.py`): Handles command-line argument parsing and user interaction
-* **YTDL Helpers** (`yt_dl_helpers.py`): YTDL-specific helper functions for path and configuration management
-* **Configuration** (`src/common/`): Python-based configuration management
-* **Path Utilities** (`path_utils/`): Generic cross-platform path handling and file operations
-* **Logging** (`logs/`): Centralized logging with hybrid approach
+### Video App Architecture
+- **Configurable**: Full control over quality, format, and output options
+- **Flexible**: Supports multiple containers and quality settings
+- **Production-Ready**: Comprehensive error handling and logging
+- **Extensible**: Easy to add new features and options
 
-### Server-Ready Design
+### Shared Architecture
+- **Modular Design**: Clean separation between core logic, CLI, and helpers
+- **Dependency Injection**: Easy testing with mocked dependencies
+- **Cross-Platform**: Handles Windows/Unix path differences
+- **Logging**: Centralized logging with appropriate levels
 
-The modular architecture supports both CLI and server environments:
+## Testing
 
-* **CLI Usage**: `python -m src.yt_dl_app "URL" [options]`
-* **Server Usage**: Import core functions directly in Django/Flask applications
-* **API Integration**: Core functions accept parameters directly (no CLI parsing needed)
-* **Dynamic Options**: Extract available formats/qualities from video metadata
+Both apps include comprehensive unit tests:
 
-### Recent Improvements
+### Running Tests
 
-The codebase has been optimized for better maintainability and server readiness:
+```bash
+# Run all tests
+python -m pytest tests/ -v
 
-* **Streamlined Entry Point**: Simplified `__main__.py` with direct CLI integration
-* **Modular Architecture**: Separated generic utilities from YTDL-specific helpers
-* **Descriptive Naming**: Renamed `utils/` to `path_utils/` for better clarity
-* **Clean Imports**: Simplified import statements with package-level exports
-* **Self-Contained Modules**: YTDL app is more cohesive with local helper functions
-* **Improved Error Handling**: Specific exception handling instead of bare `except` clauses
-* **Code Deduplication**: Eliminated redundant functions and imports
-* **Optimized Logging**: Hybrid approach with main log file and specialized logs for high-volume operations
-* **Server-Ready Architecture**: Core functions designed for both CLI and web API integration
+# Run audio app tests only
+python -m pytest tests/test_audio_app/ -v
+
+# Run video app tests only
+python -m pytest tests/test_video_app/ -v
+
+# Run with coverage
+python -m pytest tests/ --cov=src --cov-report=html
+```
+
+### Test Coverage
+
+* **Audio App**: Core download functions, CLI interface, helper functions
+* **Video App**: Core download functions, CLI interface, helper functions, metadata extraction
+* **Shared Utilities**: Path handling, configuration management
+* **Error Scenarios**: Download failures, invalid URLs, missing files
+* **Fast Execution**: All tests run with mocked dependencies (no network calls)
 
 ## Logging
 
@@ -209,7 +217,7 @@ The codebase has been optimized for better maintainability and server readiness:
 
 * **`app.log`** - Main application log (all modules)
 * **`error.log`** - Error-specific log entries
-* **`downloads.log`** - Download operations (high volume, when implemented)
+* **`downloads.log`** - Download operations (when implemented)
 * **`api.log`** - API requests/responses (when web interface added)
 
 ### Log Locations
@@ -222,47 +230,73 @@ logs/
 └── api.log            # API operations
 ```
 
-## Testing
+## Examples
 
-The project includes comprehensive unit tests for all core functionality:
-
-### Running Tests
+### Audio Download Examples
 
 ```bash
-# Run all tests
-python -m pytest tests/ -v
+# Download a song as MP3
+python -m src.yt_audio_app "https://youtu.be/dQw4w9WgXcQ"
 
-# Run specific test files
-python -m pytest tests/test_yt_dl_core.py -v
-python -m pytest tests/test_yt_dl_helpers.py -v
+# Download to custom directory
+python -m src.yt_audio_app "URL" --output-dir ./music
 
-# Run with coverage
-python -m pytest tests/ --cov=src --cov-report=html
+# Custom filename format
+python -m src.yt_audio_app "URL" --template "%(uploader)s - %(title)s.%(ext)s"
+
+# Show video info without downloading
+python -m src.yt_audio_app "URL" --metadata
 ```
 
-### Test Coverage
+### Video Download Examples
 
-* **Core Download Functions**: Audio and video download with mocked dependencies
-* **Helper Functions**: Path and configuration management
-* **Error Scenarios**: Download failures, missing files, invalid parameters
-* **Cross-Platform**: Windows/Unix path handling
-* **Fast Execution**: All tests run in under 0.2 seconds with no network calls
+```bash
+# Download best available quality
+python -m src.yt_video_app "https://youtu.be/dQw4w9WgXcQ"
 
-### Test Structure
+# Download 1080p MP4
+python -m src.yt_video_app "URL" --quality 1080p --ext mp4
 
-```
-tests/
-├── test_yt_dl_core.py      # Core download function tests
-└── test_yt_dl_helpers.py   # Helper function tests
+# Download 720p WebM
+python -m src.yt_video_app "URL" --quality 720p --ext webm
+
+# Custom filename with uploader
+python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
+
+# Safe ASCII-only filenames
+python -m src.yt_video_app "URL" --restrict-filenames
 ```
 
 ## Troubleshooting
+
+### Common Issues
 
 * **"No suitable formats"** → The chosen `--ext` or `--quality` isn't available for this video. Try another container or different quality cap.
 * **"Conversion failed!"** → This is prevented by enforcing container compatibility. Ensure you're using the correct `--ext` option.
 * **"Missing FFmpeg"** → Install FFmpeg and ensure it's in your system PATH.
 * **Logging Issues** → Check `logs/` directory for log files and verify `src/common/logging_config.py` settings.
 * **Import Errors** → Ensure you're running from the project root directory and all dependencies are installed.
+
+### Audio App Specific
+
+* **Audio quality** → Fixed at 192kbps MP3 (by design)
+* **Configuration** → No config files needed (hardcoded settings)
+* **Dependencies** → Only requires yt-dlp (no FFmpeg needed)
+
+### Video App Specific
+
+* **Configuration** → Edit `src/common/app_config.py` for default settings
+* **Quality options** → Use `--quality` flag to override config defaults
+* **Format options** → Use `--ext` flag to choose MP4 or WebM
+
+## Migration from Unified App
+
+If you were using the previous unified app:
+
+1. **For audio downloads**: Use `yt_audio_app` instead of `--audio-only` flag
+2. **For video downloads**: Use `yt_video_app` instead of the unified app
+3. **Configuration**: Video settings moved to `src/common/app_config.py`
+4. **CLI options**: Audio and video apps have separate, focused option sets
 
 ## License
 

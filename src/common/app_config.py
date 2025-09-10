@@ -7,7 +7,7 @@ replacing the previous JSON-based configuration system.
 
 from typing import Dict, Any
 
-# Application configuration
+# Application configuration for video downloader
 APP_CONFIG = {
     "download": {
         "download_path": "./downloads"
@@ -16,8 +16,7 @@ APP_CONFIG = {
         "ext": "mp4",
         "quality": "best", 
         "output_template": "%(title)s.%(ext)s",
-        "restrict_filenames": True,
-        "audio_only": False
+        "restrict_filenames": True
     }
 }
 
@@ -68,6 +67,5 @@ def get_video_settings() -> Dict[str, Any]:
         'ext': APP_CONFIG["video"]['ext'],
         'quality': APP_CONFIG["video"]['quality'],
         'output_template': APP_CONFIG["video"]['output_template'],
-        'restrict_filenames': APP_CONFIG["video"]['restrict_filenames'],
-        'audio_only': APP_CONFIG["video"]['audio_only']
+        'restrict_filenames': APP_CONFIG["video"]['restrict_filenames']
     }
