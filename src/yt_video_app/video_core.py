@@ -273,7 +273,7 @@ def _perform_download(ydl, url: str, expected_path: str, file_checker: Callable)
 def download_video_with_audio(url: str, outtmpl: Optional[str] = None, 
                             restrict: Optional[bool] = None, ext: Optional[str] = None, 
                             quality: Optional[str] = None, audio_lang: str = 'original',
-                            subtitle_lang: Optional[str] = None,
+                            subtitle_lang: Optional[str] = None, force: bool = False,
                             progress_callback: Optional[Callable] = None,
                             config: Optional[Dict[str, Any]] = None,
                             downloader=None, file_checker=None) -> Optional[str]:
@@ -287,6 +287,7 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         quality: Quality setting ('best' or height like '1080p') (uses config default if None)
         audio_lang: Audio language code ('original' for default, or specific language code)
         subtitle_lang: Subtitle language code to embed (optional)
+        force: Whether to force download even if file exists (skips file existence check)
         progress_callback: Optional progress callback function
         config: Configuration dictionary (loads from file if None)
         downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
@@ -325,9 +326,13 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         merge_ext = ext if ext in ('mp4', 'webm') else 'mp4'
         expected_path = _extract_expected_filename(ydl, info, merge_ext)
         
-        # Check if file already exists
-        if _check_file_exists(expected_path, file_checker):
+        # Check if file already exists (skip if force is True)
+        if not force and _check_file_exists(expected_path, file_checker):
             return expected_path
+        
+        # Log force behavior
+        if force:
+            logger.info("Force mode enabled - skipping file existence check")
         
         # Perform download
         if _perform_download(ydl, url, expected_path, file_checker):
