@@ -5,7 +5,11 @@ This module contains all application configuration settings in Python format,
 replacing the previous JSON-based configuration system.
 """
 
+import logging
 from typing import Dict, Any
+
+# Initialize logger for this module
+logger = logging.getLogger("app_config")
 
 # Application configuration for video downloader
 APP_CONFIG = {
@@ -33,7 +37,10 @@ def get_config() -> Dict[str, Any]:
     Returns:
         Configuration dictionary
     """
-    return APP_CONFIG.copy()
+    logger.debug("Retrieving application configuration")
+    config = APP_CONFIG.copy()
+    logger.debug(f"Configuration loaded: {len(config)} top-level sections")
+    return config
 
 def get_download_config() -> Dict[str, Any]:
     """
@@ -42,7 +49,10 @@ def get_download_config() -> Dict[str, Any]:
     Returns:
         Download configuration dictionary
     """
-    return APP_CONFIG["download"].copy()
+    logger.debug("Retrieving download configuration")
+    config = APP_CONFIG["download"].copy()
+    logger.debug(f"Download path: {config.get('download_path', 'default')}")
+    return config
 
 def get_video_config() -> Dict[str, Any]:
     """
@@ -51,7 +61,10 @@ def get_video_config() -> Dict[str, Any]:
     Returns:
         Video configuration dictionary
     """
-    return APP_CONFIG["video"].copy()
+    logger.debug("Retrieving video configuration")
+    config = APP_CONFIG["video"].copy()
+    logger.debug(f"Video settings: ext={config.get('ext')}, quality={config.get('quality')}")
+    return config
 
 def get_download_path() -> str:
     """
@@ -60,7 +73,10 @@ def get_download_path() -> str:
     Returns:
         Download path string
     """
-    return APP_CONFIG["download"]["download_path"]
+    logger.debug("Retrieving download path from configuration")
+    path = APP_CONFIG["download"]["download_path"]
+    logger.debug(f"Download path: {path}")
+    return path
 
 def get_video_settings() -> Dict[str, Any]:
     """
@@ -69,12 +85,15 @@ def get_video_settings() -> Dict[str, Any]:
     Returns:
         Video settings dictionary
     """
-    return {
+    logger.debug("Retrieving video settings from configuration")
+    settings = {
         'ext': APP_CONFIG["video"]['ext'],
         'quality': APP_CONFIG["video"]['quality'],
         'output_template': APP_CONFIG["video"]['output_template'],
         'restrict_filenames': APP_CONFIG["video"]['restrict_filenames']
     }
+    logger.debug(f"Video settings: {settings}")
+    return settings
 
 def get_feature_flags() -> Dict[str, Any]:
     """
@@ -83,7 +102,10 @@ def get_feature_flags() -> Dict[str, Any]:
     Returns:
         Feature flags dictionary
     """
-    return APP_CONFIG["features"].copy()
+    logger.debug("Retrieving feature flags configuration")
+    flags = APP_CONFIG["features"].copy()
+    logger.debug(f"Feature flags: {flags}")
+    return flags
 
 def is_database_source_enabled() -> bool:
     """
@@ -92,7 +114,9 @@ def is_database_source_enabled() -> bool:
     Returns:
         True if database should be used as source of truth, False otherwise
     """
-    return APP_CONFIG["features"]["use_database_as_source"]
+    enabled = APP_CONFIG["features"]["use_database_as_source"]
+    logger.debug(f"Database source enabled: {enabled}")
+    return enabled
 
 def is_file_check_enabled() -> bool:
     """
@@ -101,7 +125,9 @@ def is_file_check_enabled() -> bool:
     Returns:
         True if file existence check should be performed, False otherwise
     """
-    return APP_CONFIG["features"]["enable_file_existence_check"]
+    enabled = APP_CONFIG["features"]["enable_file_existence_check"]
+    logger.debug(f"File existence check enabled: {enabled}")
+    return enabled
 
 def is_metadata_caching_enabled() -> bool:
     """
@@ -110,7 +136,9 @@ def is_metadata_caching_enabled() -> bool:
     Returns:
         True if metadata caching is enabled, False otherwise
     """
-    return APP_CONFIG["features"]["enable_metadata_caching"]
+    enabled = APP_CONFIG["features"]["enable_metadata_caching"]
+    logger.debug(f"Metadata caching enabled: {enabled}")
+    return enabled
 
 def is_download_history_enabled() -> bool:
     """
@@ -119,4 +147,6 @@ def is_download_history_enabled() -> bool:
     Returns:
         True if download history is enabled, False otherwise
     """
-    return APP_CONFIG["features"]["enable_download_history"]
+    enabled = APP_CONFIG["features"]["enable_download_history"]
+    logger.debug(f"Download history enabled: {enabled}")
+    return enabled

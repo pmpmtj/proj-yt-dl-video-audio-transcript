@@ -6,6 +6,23 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 - **Video Downloader** (`yt_video_app`): Configurable video downloads with quality/format options
 - **Transcript Downloader** (`yt_transcript_app`): Download transcripts with multiple format support
 
+## Quick Start
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Download audio, video, and transcript for any YouTube video
+python -m src audio "https://www.youtube.com/watch?v=VIDEO_ID"
+python -m src video download "https://www.youtube.com/watch?v=VIDEO_ID"
+python -m src transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Or run individual apps directly
+python -m src.yt_audio_app "URL"
+python -m src.yt_video_app download "URL"
+python -m src.yt_transcript_app "URL"
+```
+
 ## Features
 
 ### Audio Downloader (`yt_audio_app`)
@@ -68,7 +85,118 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 
 ## Usage
 
-### Audio Downloader
+### Main Suite (Recommended)
+
+Run the unified YouTube Downloader Suite with a single command. This provides a consistent interface across all three applications:
+
+```bash
+# Show help for the main suite
+python -m src --help
+
+# Audio download through main suite
+python -m src audio "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Video download through main suite
+python -m src video download "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Transcript download through main suite
+python -m src transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+```
+
+#### Main Suite Examples
+
+**Audio Downloads:**
+```bash
+# Basic audio download
+python -m src audio "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Custom output directory
+python -m src audio "URL" --output-dir ./music
+
+# Custom filename template
+python -m src audio "URL" --template "%(uploader)s - %(title)s.%(ext)s"
+
+# Show metadata without downloading
+python -m src audio "URL" --metadata
+
+# Quiet mode
+python -m src audio "URL" --quiet
+
+# Multiuser mode
+python -m src audio "URL" --session-id "user-123"
+```
+
+**Video Downloads:**
+```bash
+# Basic video download
+python -m src video download "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Specific quality and format
+python -m src video download "URL" --quality 1080p --ext mp4
+
+# Download with specific audio language
+python -m src video download "URL" --audio-lang en --quality 720p
+
+# Download with audio language and subtitles
+python -m src video download "URL" --audio-lang en --subtitle-lang en
+
+# Force download even if file exists
+python -m src video download "URL" --force
+
+# Get video information without downloading
+python -m src video info "URL"
+
+# Check available languages
+python -m src video languages "URL"
+
+# Check available formats and qualities
+python -m src video formats "URL"
+
+# Show configuration and feature flags
+python -m src video config
+```
+
+**Transcript Downloads:**
+```bash
+# Basic transcript download (all formats)
+python -m src transcript "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Custom output directory
+python -m src transcript "URL" --output-dir ./transcripts
+
+# Custom filename template
+python -m src transcript "URL" --template "my_transcript"
+
+# Specific language
+python -m src transcript "URL" --language en
+
+# Specific formats only
+python -m src transcript "URL" --formats clean structured
+
+# Skip rich metadata analysis
+python -m src transcript "URL" --no-metadata-analysis
+
+# Show transcript metadata without downloading
+python -m src transcript "URL" --metadata
+
+# Preview transcript content
+python -m src transcript "URL" --preview
+
+# List available languages
+python -m src transcript "URL" --list-languages
+
+# Quiet mode
+python -m src transcript "URL" --quiet
+
+# Multiuser mode
+python -m src transcript "URL" --session-id "user-789"
+```
+
+### Individual Apps
+
+You can also run each application directly:
+
+#### Audio Downloader
 
 Download audio only as MP3 with hardcoded settings (192kbps):
 
@@ -89,7 +217,7 @@ python -m src.yt_audio_app "URL" --metadata
 python -m src.yt_audio_app "URL" --quiet
 ```
 
-### Video Downloader
+#### Video Downloader
 
 Download video with configurable quality, format, and language options:
 
@@ -131,7 +259,7 @@ python -m src.yt_video_app formats "URL"
 python -m src.yt_video_app config
 ```
 
-### Transcript Downloader
+#### Transcript Downloader
 
 Download transcripts with multiple format support and rich metadata:
 
@@ -307,6 +435,8 @@ The audio downloader has **hardcoded settings** for simplicity:
 ```
 my_project/
 ├── src/
+│   ├── __main__.py             # Main suite entry point
+│   ├── main.py                 # Main suite application logic
 │   ├── yt_audio_app/           # Audio downloader (hardcoded settings)
 │   │   ├── __init__.py
 │   │   ├── __main__.py
@@ -323,14 +453,14 @@ my_project/
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   ├── trans_core.py       # Transcript download logic
-│   │   ├── trans_cli.py        # Transcript CLI interface
+│   │   ├── trans_core_cli.py   # Transcript CLI interface
 │   │   ├── transcript_processor.py
 │   │   ├── metadata_collector.py
 │   │   ├── metadata_exporter.py
 │   │   └── get_transcript_list.py
 │   └── common/                 # Shared utilities
 │       ├── app_config.py       # App configuration
-│       ├── logging_config.py   # Shared logging configuration
+│       ├── logging_config.py   # Centralized logging configuration
 │       └── user_context.py     # Multiuser session management
 ├── path_utils/                 # Shared path utilities
 ├── downloads/                  # Download directories (multiuser structure)
@@ -439,26 +569,83 @@ This will demonstrate:
 
 ## Logging
 
+The YouTube Downloader Suite includes comprehensive centralized logging across all applications.
+
 ### Log Files
 
-* **`app.log`** - Main application log (all modules)
-* **`error.log`** - Error-specific log entries
-* **`downloads.log`** - Download operations (when implemented)
-* **`api.log`** - API requests/responses (when web interface added)
+* **`app.log`** - Main application log (all modules, INFO level and above)
+* **`error.log`** - Error-specific log entries (ERROR level only)
 
 ### Log Locations
 
 ```
 logs/
-├── app.log             # Main application log
-├── error.log           # Error-specific entries
-├── downloads.log       # Download operations
-└── api.log            # API operations
+├── app.log             # Main application log (rotating, 1MB max)
+└── error.log           # Error-specific entries (rotating, 512KB max)
+```
+
+### Logging Features
+
+- **Centralized Configuration**: Single logging setup across all applications
+- **Multiple Outputs**: Console output + rotating log files
+- **Module-Specific Loggers**: Each module has its own logger with descriptive names
+- **Appropriate Levels**: DEBUG, INFO, WARNING, ERROR levels used throughout
+- **Automatic Setup**: Logging is initialized when running any application
+- **File Rotation**: Log files rotate automatically to prevent disk space issues
+
+### Log Levels
+
+- **DEBUG**: Detailed information for debugging (file operations, configuration loading)
+- **INFO**: General information about application flow (downloads, user actions)
+- **WARNING**: Warning messages (fallback operations, missing optional features)
+- **ERROR**: Error messages (download failures, invalid inputs)
+
+### Viewing Logs
+
+```bash
+# View main application log
+cat logs/app.log
+
+# View error log only
+cat logs/error.log
+
+# Follow logs in real-time
+tail -f logs/app.log
+
+# Search for specific errors
+grep ERROR logs/app.log
 ```
 
 ## Examples
 
-### Audio Download Examples
+### Main Suite Examples
+
+**Quick Start:**
+```bash
+# Download audio, video, and transcript for the same video
+python -m src audio "https://youtu.be/dQw4w9WgXcQ"
+python -m src video download "https://youtu.be/dQw4w9WgXcQ"
+python -m src transcript "https://youtu.be/dQw4w9WgXcQ"
+```
+
+**Advanced Usage:**
+```bash
+# Download 1080p video with English audio and subtitles
+python -m src video download "URL" --quality 1080p --audio-lang en --subtitle-lang en
+
+# Download transcript in specific language with custom output
+python -m src transcript "URL" --language es --output-dir ./spanish_transcripts
+
+# Preview transcript before downloading
+python -m src transcript "URL" --preview
+
+# Get video information without downloading
+python -m src video info "URL"
+```
+
+### Individual App Examples
+
+#### Audio Download Examples
 
 ```bash
 # Download a song as MP3 (saves to downloads/audio/)
@@ -574,8 +761,10 @@ python -m src.yt_transcript_app "URL1" --session-id "user-123"
 * **"No suitable formats"** → The chosen `--ext` or `--quality` isn't available for this video. Try another container or different quality cap.
 * **"Conversion failed!"** → This is prevented by enforcing container compatibility. Ensure you're using the correct `--ext` option.
 * **"Missing FFmpeg"** → Install FFmpeg and ensure it's in your system PATH.
+* **"No module named src"** → Ensure you're running from the project root directory and using `python -m src` command.
 * **Logging Issues** → Check `logs/` directory for log files and verify `src/common/logging_config.py` settings.
 * **Import Errors** → Ensure you're running from the project root directory and all dependencies are installed.
+* **Main Suite Not Working** → Try running individual apps directly: `python -m src.yt_audio_app --help`
 
 ### Audio App Specific
 

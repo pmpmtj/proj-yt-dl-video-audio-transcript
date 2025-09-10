@@ -43,7 +43,7 @@ def parse_audio_args() -> argparse.Namespace:
 Examples:
   python -m src.yt_audio_app "https://www.youtube.com/watch?v=VIDEO_ID"
   python -m src.yt_audio_app "https://youtu.be/VIDEO_ID" --output-dir ./music
-  python -m src.yt_audio_app "URL" --template "%(uploader)s - %(title)s.%(ext)s"
+  python -m src.yt_audio_app "URL" --template "%%(uploader)s - %%(title)s.%%(ext)s"
   python -m src.yt_audio_app "URL" --metadata
         """
     )
@@ -61,7 +61,7 @@ Examples:
     
     parser.add_argument(
         '--template', '-t',
-        help='Output filename template (default: %(title)s.%(ext)s)'
+        help='Output filename template (default: %%(title)s.%%(ext)s)'
     )
     
     parser.add_argument(
