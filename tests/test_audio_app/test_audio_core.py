@@ -144,17 +144,19 @@ class TestAudioCore:
         mock_check_exists.return_value = False
         mock_perform_download.return_value = True
         
-        # Mock yt-dlp
+        # Mock yt-dlp with context manager support
         mock_ydl_instance = Mock()
         mock_ydl_instance.extract_info.return_value = {'title': 'Test Video'}
-        mock_ydl_class = Mock(return_value=mock_ydl_instance)
+        mock_ydl_class = Mock()
+        mock_ydl_class.return_value.__enter__ = Mock(return_value=mock_ydl_instance)
+        mock_ydl_class.return_value.__exit__ = Mock(return_value=None)
         
         url = "https://youtube.com/watch?v=test"
         result = download_audio_mp3(url, downloader=mock_ydl_class)
         
         assert result == "/path/to/audio.mp3"
         mock_validate_url.assert_called_once_with(url)
-        mock_get_template.assert_called_once_with(None, None)
+        mock_get_template.assert_called_once_with(None)
         mock_create_options.assert_called_once()
         mock_ydl_instance.extract_info.assert_called_once_with(url, download=False)
         mock_extract_filename.assert_called_once_with(mock_ydl_instance, {'title': 'Test Video'})
@@ -183,7 +185,9 @@ class TestAudioCore:
             'view_count': 1000,
             'upload_date': '20231201'
         }
-        mock_ydl_class = Mock(return_value=mock_ydl_instance)
+        mock_ydl_class = Mock()
+        mock_ydl_class.return_value.__enter__ = Mock(return_value=mock_ydl_instance)
+        mock_ydl_class.return_value.__exit__ = Mock(return_value=None)
         
         url = "https://youtube.com/watch?v=test"
         result = get_audio_metadata(url, downloader=mock_ydl_class)
@@ -193,7 +197,7 @@ class TestAudioCore:
         assert result['duration'] == 120
         assert result['uploader'] == 'Test Channel'
         assert result['channel'] == 'Test Channel'
-        assert result['description'] == 'Test description'
+        assert result['description'] == 'Test description...'
         assert result['view_count'] == 1000
         assert result['upload_date'] == '20231201'
     

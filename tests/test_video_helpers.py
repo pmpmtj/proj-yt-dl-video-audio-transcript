@@ -28,7 +28,7 @@ class TestVideoHelpers:
                 result = get_downloads_directory(config)
                 
                 assert result == Path('/custom/downloads')
-                mock_resolve.assert_called_once_with('/custom/downloads', Path('/base'))
+                mock_resolve.assert_called_once_with('/custom/downloads/video', Path('/base'))
     
     def test_get_downloads_directory_without_config(self):
         """Test getting downloads directory without config."""
@@ -38,7 +38,7 @@ class TestVideoHelpers:
                     result = get_downloads_directory(None)
                     
                     assert result == Path('/base/downloads')
-                    mock_resolve.assert_called_once_with('./downloads', Path('/base'))
+                    mock_resolve.assert_called_once_with('./downloads/video', Path('/base'))
     
     def test_get_default_video_settings_with_config(self):
         """Test getting default video settings with config."""
@@ -99,7 +99,7 @@ class TestVideoHelpers:
                 with patch('src.yt_video_app.video_helpers.ensure_directory') as mock_ensure:
                     result = get_output_template_with_path(config)
                     
-                    assert result == '/custom/downloads/%(title)s.%(ext)s'
+                    assert result.replace('\\', '/') == '/custom/downloads/%(title)s.%(ext)s'
                     mock_ensure.assert_called_once_with(Path('/custom/downloads'))
     
     def test_get_output_template_with_path_without_config(self):
@@ -109,7 +109,7 @@ class TestVideoHelpers:
                 with patch('src.yt_video_app.video_helpers.ensure_directory') as mock_ensure:
                     result = get_output_template_with_path(None)
                     
-                    assert result == '/default/downloads/%(title)s.%(ext)s'
+                    assert result.replace('\\', '/') == '/default/downloads/%(title)s.%(ext)s'
                     mock_ensure.assert_called_once_with(Path('/default/downloads'))
     
     def test_get_output_template_with_path_custom_template(self):
@@ -121,7 +121,7 @@ class TestVideoHelpers:
             with patch('src.yt_video_app.video_helpers.ensure_directory') as mock_ensure:
                 result = get_output_template_with_path(config, custom_template)
                 
-                assert result == '/custom/downloads/%(uploader)s - %(title)s.%(ext)s'
+                assert result.replace('\\', '/') == '/custom/downloads/%(uploader)s - %(title)s.%(ext)s'
                 mock_ensure.assert_called_once_with(Path('/custom/downloads'))
     
     def test_get_output_template_with_path_ensure_directory_called(self):

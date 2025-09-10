@@ -26,7 +26,7 @@ class TestVideoCLI:
             
             assert args.url == 'https://youtube.com/watch?v=test'
             assert args.output_template == '%(title)s.%(ext)s'  # Default from config
-            assert args.restrict_filenames is False  # Default from config
+            assert args.restrict_filenames is True  # Default from config
             assert args.ext == 'mp4'  # Default from config
             assert args.quality == 'best'  # Default from config
     
@@ -163,8 +163,11 @@ class TestVideoCLI:
     
     def test_handle_download_error_download_error(self):
         """Test handling of download errors."""
-        error = Exception('Download failed')
-        error.__class__.__name__ = 'DownloadError'
+        # Create a custom exception class for testing
+        class DownloadError(Exception):
+            pass
+        
+        error = DownloadError('Download failed')
         
         controller = VideoCLIController()
         

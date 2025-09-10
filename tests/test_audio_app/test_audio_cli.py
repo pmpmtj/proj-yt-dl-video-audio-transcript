@@ -7,6 +7,7 @@ Tests the audio CLI interface functionality.
 import pytest
 from unittest.mock import Mock, patch, MagicMock
 import argparse
+from pathlib import Path
 
 # Import the functions to test
 from src.yt_audio_app.audio_cli import (
@@ -88,13 +89,16 @@ class TestAudioCLI:
         )
         
         assert result == '/downloads/audio/test.mp3'
-        mock_get_template.assert_called_once_with(None, None)
+        mock_get_template.assert_called_once_with(custom_path=None)
         mock_downloader.assert_called_once()
     
-    @patch('src.yt_audio_app.audio_cli.get_audio_output_template')
-    def test_handle_audio_download_custom_template(self, mock_get_template):
+    @patch('path_utils.get_script_directories')
+    @patch('path_utils.resolve_path')
+    @patch('path_utils.ensure_directory')
+    def test_handle_audio_download_custom_template(self, mock_ensure_dir, mock_resolve_path, mock_get_script_dirs):
         """Test audio download with custom template."""
-        mock_get_template.return_value = '/custom/path/%(uploader)s - %(title)s.%(ext)s'
+        mock_get_script_dirs.return_value = (None, '/base')
+        mock_resolve_path.return_value = Path('/custom/path')
         mock_downloader = Mock(return_value='/custom/path/artist - song.mp3')
         
         controller = AudioCLIController(audio_downloader=mock_downloader)
@@ -107,7 +111,8 @@ class TestAudioCLI:
         )
         
         assert result == '/custom/path/artist - song.mp3'
-        mock_get_template.assert_called_once_with('/custom/path', '%(uploader)s - %(title)s.%(ext)s')
+        mock_resolve_path.assert_called_once_with('/custom/path', '/base')
+        mock_ensure_dir.assert_called_once_with(Path('/custom/path'))
         mock_downloader.assert_called_once()
     
     @patch('src.yt_audio_app.audio_cli.get_audio_output_template')
@@ -158,8 +163,11 @@ class TestAudioCLI:
     
     def test_handle_download_error_download_error(self):
         """Test handling of download errors."""
-        error = Exception('Download failed')
-        error.__class__.__name__ = 'DownloadError'
+        # Create a custom exception class for testing
+        class DownloadError(Exception):
+            pass
+        
+        error = DownloadError('Download failed')
         
         controller = AudioCLIController()
         

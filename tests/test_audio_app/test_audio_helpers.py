@@ -63,7 +63,7 @@ class TestAudioHelpers:
         
         result = get_audio_output_template()
         
-        assert result == '/downloads/audio/%(title)s.%(ext)s'
+        assert result.replace('\\', '/') == '/downloads/audio/%(title)s.%(ext)s'
         mock_get_dir.assert_called_once_with(None)
         mock_ensure_dir.assert_called_once_with(Path('/downloads/audio'))
     
@@ -75,7 +75,7 @@ class TestAudioHelpers:
         
         result = get_audio_output_template(custom_path='/custom/audio')
         
-        assert result == '/custom/audio/%(title)s.%(ext)s'
+        assert result.replace('\\', '/') == '/custom/audio/%(title)s.%(ext)s'
         mock_get_dir.assert_called_once_with('/custom/audio')
         mock_ensure_dir.assert_called_once_with(Path('/custom/audio'))
     
@@ -87,7 +87,7 @@ class TestAudioHelpers:
         
         result = get_audio_output_template(custom_template='%(uploader)s - %(title)s.%(ext)s')
         
-        assert result == '/downloads/audio/%(uploader)s - %(title)s.%(ext)s'
+        assert result.replace('\\', '/') == '/downloads/audio/%(uploader)s - %(title)s.%(ext)s'
         mock_get_dir.assert_called_once_with(None)
         mock_ensure_dir.assert_called_once_with(Path('/downloads/audio'))
     

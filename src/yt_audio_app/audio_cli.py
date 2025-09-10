@@ -164,7 +164,7 @@ class AudioCLIController:
                 output_template = get_audio_output_template(template=template)
         else:
             # Use default template with custom or default directory
-            output_template = get_audio_output_template(output_dir)
+            output_template = get_audio_output_template(custom_path=output_dir)
         
         logger.debug(f"Using output template: {output_template}")
         
