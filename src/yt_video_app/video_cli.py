@@ -15,7 +15,10 @@ import yt_dlp
 # Import core video business logic functions
 from .video_core import (
     download_video_with_audio,
-    default_video_progress_hook
+    default_video_progress_hook,
+    get_video_metadata,
+    get_video_languages,
+    get_video_formats
 )
 
 # Import configuration utilities
@@ -51,31 +54,65 @@ def parse_args() -> argparse.Namespace:
             'restrict_filenames': False
         }
     
-    p = argparse.ArgumentParser(
+    # Create main parser with subcommands
+    parser = argparse.ArgumentParser(
         description='YouTube video downloader with configurable quality and format options.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python -m src.yt_video_app "https://www.youtube.com/watch?v=VIDEO_ID"
-  python -m src.yt_video_app "URL" --quality 1080p --ext mp4
-  python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
-  python -m src.yt_video_app "URL" --ext webm --quality 720p
+  # Download video
+  python -m src.yt_video_app download "https://www.youtube.com/watch?v=VIDEO_ID"
+  python -m src.yt_video_app download "URL" --quality 1080p --ext mp4
+  
+  # Get video information
+  python -m src.yt_video_app info "https://www.youtube.com/watch?v=VIDEO_ID"
+  python -m src.yt_video_app languages "https://www.youtube.com/watch?v=VIDEO_ID"
+  python -m src.yt_video_app formats "https://www.youtube.com/watch?v=VIDEO_ID"
         """
     )
-    p.add_argument('url', help='YouTube video URL to download')
-    p.add_argument('--output-template', default=video_settings['output_template'], 
-                   help=f'yt-dlp output template (default: {video_settings["output_template"].replace("%", "%%")})')
-    p.add_argument('--restrict-filenames', action='store_true', 
-                   default=video_settings['restrict_filenames'],
-                   help='Safer ASCII-only filenames.')
-    p.add_argument('--ext', choices=['mp4','webm'], default=video_settings['ext'], 
-                   help=f'Preferred output container (default: {video_settings["ext"]}).')
-    p.add_argument('--quality', choices=['best','2160p','1440p','1080p','720p','480p','360p','144p'], 
-                   default=video_settings['quality'], 
-                   help=f'Target video quality (cap). Default: {video_settings["quality"]}.')
     
-    args = p.parse_args()
-    logger.info(f"Parsed arguments: URL={args.url}, ext={args.ext}, quality={args.quality}")
+    # Create subparsers
+    subparsers = parser.add_subparsers(dest='command', help='Available commands')
+    
+    # Download subcommand
+    download_parser = subparsers.add_parser('download', help='Download video with audio')
+    download_parser.add_argument('url', help='YouTube video URL to download')
+    download_parser.add_argument('--output-template', default=video_settings['output_template'], 
+                               help=f'yt-dlp output template (default: {video_settings["output_template"].replace("%", "%%")})')
+    download_parser.add_argument('--restrict-filenames', action='store_true', 
+                               default=video_settings['restrict_filenames'],
+                               help='Safer ASCII-only filenames.')
+    download_parser.add_argument('--ext', choices=['mp4','webm'], default=video_settings['ext'], 
+                               help=f'Preferred output container (default: {video_settings["ext"]}).')
+    download_parser.add_argument('--quality', choices=['best','2160p','1440p','1080p','720p','480p','360p','144p'], 
+                               default=video_settings['quality'], 
+                               help=f'Target video quality (cap). Default: {video_settings["quality"]}.')
+    
+    # Info subcommand
+    info_parser = subparsers.add_parser('info', help='Get video metadata information')
+    info_parser.add_argument('url', help='YouTube video URL to get information from')
+    
+    # Languages subcommand
+    languages_parser = subparsers.add_parser('languages', help='Get available audio and subtitle languages')
+    languages_parser.add_argument('url', help='YouTube video URL to get language information from')
+    
+    # Formats subcommand
+    formats_parser = subparsers.add_parser('formats', help='Get available video formats and qualities')
+    formats_parser.add_argument('url', help='YouTube video URL to get format information from')
+    
+    # For backward compatibility, if no subcommand is provided, treat as download
+    args = parser.parse_args()
+    
+    # Handle backward compatibility - if no command specified, assume download
+    if args.command is None:
+        # Re-parse with download as default command
+        import sys
+        if len(sys.argv) > 1 and not sys.argv[1] in ['download', 'info', 'languages', 'formats']:
+            # Insert 'download' as the first argument
+            sys.argv.insert(1, 'download')
+            args = parser.parse_args()
+    
+    logger.info(f"Parsed arguments: command={args.command}, URL={getattr(args, 'url', 'N/A')}")
     return args
 
 
@@ -173,36 +210,121 @@ class VideoCLIController:
             logger.error(f"Unexpected error: {error}")
             print(f"Unexpected error: {error}")
     
+    def handle_info_command(self, url: str) -> None:
+        """Handle the info command to display video metadata.
+        
+        Args:
+            url: Video URL to get information from
+        """
+        logger.info(f"Getting video metadata for: {url}")
+        try:
+            metadata = get_video_metadata(url)
+            print("\n=== Video Information ===")
+            print(f"Title: {metadata.get('title', 'Unknown')}")
+            print(f"Video ID: {metadata.get('video_id', 'Unknown')}")
+            print(f"Duration: {metadata.get('duration', 'Unknown')} seconds")
+            print(f"Uploader: {metadata.get('uploader', 'Unknown')}")
+            print(f"Channel: {metadata.get('channel', 'Unknown')}")
+        except Exception as e:
+            logger.error(f"Failed to get video metadata: {e}")
+            print(f"Error getting video metadata: {e}")
+            raise
+    
+    def handle_languages_command(self, url: str) -> None:
+        """Handle the languages command to display available languages.
+        
+        Args:
+            url: Video URL to get language information from
+        """
+        logger.info(f"Getting video languages for: {url}")
+        try:
+            languages = get_video_languages(url)
+            
+            print("\n=== Available Audio Languages ===")
+            for lang in languages['audio_languages']:
+                print(f"  {lang['code']}: {lang['label']}")
+            
+            print("\n=== Available Subtitle Languages ===")
+            for lang in languages['subtitle_languages']:
+                print(f"  {lang['code']}: {lang['label']}")
+                
+        except Exception as e:
+            logger.error(f"Failed to get video languages: {e}")
+            print(f"Error getting video languages: {e}")
+            raise
+    
+    def handle_formats_command(self, url: str) -> None:
+        """Handle the formats command to display available formats.
+        
+        Args:
+            url: Video URL to get format information from
+        """
+        logger.info(f"Getting video formats for: {url}")
+        try:
+            formats = get_video_formats(url)
+            
+            print("\n=== Available Container Formats ===")
+            for container in formats['containers']:
+                print(f"  {container.upper()}")
+            
+            print("\n=== Available Video Qualities ===")
+            for quality in formats['qualities']:
+                print(f"  {quality}p")
+                
+        except Exception as e:
+            logger.error(f"Failed to get video formats: {e}")
+            print(f"Error getting video formats: {e}")
+            raise
+
     def run(self, args: argparse.Namespace) -> None:
         """Run the CLI workflow with the given arguments.
         
         Args:
             args: Parsed command line arguments
         """
-        logger.info("Starting CLI workflow")
-        
-        # Load configuration
-        config, video_settings = self.load_configuration()
-        
-        # Determine output template
-        output_template = self.determine_output_template(
-            args.output_template, 
-            video_settings['output_template']
-        )
-        logger.debug(f"Using output template: {output_template or 'default'}")
+        logger.info(f"Starting CLI workflow for command: {args.command}")
         
         try:
-            path = self.handle_video_download(
-                args.url, 
-                output_template, 
-                args.restrict_filenames, 
-                args.ext, 
-                args.quality,
-                config
-            )
-            print(f"\nVideo download completed: {path or 'failed'}")
+            if args.command == 'download':
+                # Load configuration for download
+                config, video_settings = self.load_configuration()
+                
+                # Determine output template
+                output_template = self.determine_output_template(
+                    args.output_template, 
+                    video_settings['output_template']
+                )
+                logger.debug(f"Using output template: {output_template or 'default'}")
+                
+                path = self.handle_video_download(
+                    args.url, 
+                    output_template, 
+                    args.restrict_filenames, 
+                    args.ext, 
+                    args.quality,
+                    config
+                )
+                print(f"\nVideo download completed: {path or 'failed'}")
+                
+            elif args.command == 'info':
+                self.handle_info_command(args.url)
+                
+            elif args.command == 'languages':
+                self.handle_languages_command(args.url)
+                
+            elif args.command == 'formats':
+                self.handle_formats_command(args.url)
+                
+            else:
+                print(f"Unknown command: {args.command}")
+                sys.exit(1)
+                
         except Exception as e:
-            self.handle_download_error(e)
+            if args.command == 'download':
+                self.handle_download_error(e)
+            else:
+                logger.error(f"Command failed: {e}")
+                print(f"Error: {e}")
             raise
 
 

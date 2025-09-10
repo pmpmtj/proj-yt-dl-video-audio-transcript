@@ -245,10 +245,14 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
     ydl_opts = _create_video_ydl_options(outtmpl, restrict, ext, quality, progress_callback)
     logger.debug(f"yt-dlp options: {ydl_opts}")
     
+    # Get video information using shared function
+    try:
+        info = get_video_info(url, downloader)
+    except Exception as e:
+        logger.error(f"Failed to extract video information: {e}")
+        return None
+    
     with downloader(ydl_opts) as ydl:
-        logger.info("Extracting video information...")
-        info = ydl.extract_info(url, download=False)
-        
         # Determine expected file extension
         merge_ext = ext if ext in ('mp4', 'webm') else 'mp4'
         expected_path = _extract_expected_filename(ydl, info, merge_ext)
@@ -357,3 +361,143 @@ def extract_subtitle_languages(info: Dict[str, Any]) -> List[Dict[str, str]]:
             if isinstance(k, str):
                 keys.add(k.strip())
     return [{ 'code': k, 'label': _label_for_lang(k) } for k in sorted(keys)]
+
+
+# --- Shared Video Information Functions -----------------------------------------
+
+def get_video_info(url: str, downloader=None) -> Dict[str, Any]:
+    """Extract video information from YouTube URL without downloading.
+    
+    This is the shared function that eliminates duplication of ydl.extract_info calls.
+    All other functions that need video metadata should use this function.
+    
+    Args:
+        url: YouTube URL to extract information from
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        
+    Returns:
+        Dictionary containing complete video information from yt-dlp
+        
+    Raises:
+        ValueError: If URL is invalid
+        RuntimeError: If information extraction fails
+    """
+    logger.info(f"Extracting video information for URL: {url}")
+    
+    # Set up dependencies
+    if downloader is None:
+        downloader = yt_dlp.YoutubeDL
+    
+    # Create minimal options for information extraction
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+    }
+    
+    with downloader(ydl_opts) as ydl:
+        try:
+            info = ydl.extract_info(url, download=False)
+            logger.debug(f"Successfully extracted video information for: {info.get('title', 'Unknown')}")
+            return info
+        except Exception as e:
+            error_msg = f"Failed to extract video information: {e}"
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
+
+
+def get_video_metadata(url: str, downloader=None) -> Dict[str, Any]:
+    """Get basic video metadata from YouTube URL without downloading.
+    
+    Args:
+        url: YouTube URL to extract metadata from
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        
+    Returns:
+        Dictionary containing basic video metadata
+        
+    Raises:
+        ValueError: If URL is invalid
+        RuntimeError: If metadata extraction fails
+    """
+    logger.info(f"Getting video metadata for URL: {url}")
+    
+    try:
+        info = get_video_info(url, downloader)
+        metadata = extract_basic_meta(info)
+        logger.debug(f"Extracted metadata: {metadata}")
+        return metadata
+    except Exception as e:
+        error_msg = f"Failed to get video metadata: {e}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+
+
+def get_video_languages(url: str, downloader=None) -> Dict[str, List[Dict[str, str]]]:
+    """Get available audio and subtitle languages from YouTube URL without downloading.
+    
+    Args:
+        url: YouTube URL to extract language information from
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        
+    Returns:
+        Dictionary containing:
+        - 'audio_languages': List of available audio languages
+        - 'subtitle_languages': List of available subtitle languages
+        
+    Raises:
+        ValueError: If URL is invalid
+        RuntimeError: If language extraction fails
+    """
+    logger.info(f"Getting video languages for URL: {url}")
+    
+    try:
+        info = get_video_info(url, downloader)
+        audio_langs = extract_audio_languages(info)
+        subtitle_langs = extract_subtitle_languages(info)
+        
+        result = {
+            'audio_languages': audio_langs,
+            'subtitle_languages': subtitle_langs
+        }
+        
+        logger.debug(f"Found {len(audio_langs)} audio languages and {len(subtitle_langs)} subtitle languages")
+        return result
+    except Exception as e:
+        error_msg = f"Failed to get video languages: {e}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
+
+
+def get_video_formats(url: str, downloader=None) -> Dict[str, Any]:
+    """Get available video formats and qualities from YouTube URL without downloading.
+    
+    Args:
+        url: YouTube URL to extract format information from
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        
+    Returns:
+        Dictionary containing:
+        - 'containers': List of available container formats
+        - 'qualities': List of available video qualities (heights)
+        
+    Raises:
+        ValueError: If URL is invalid
+        RuntimeError: If format extraction fails
+    """
+    logger.info(f"Getting video formats for URL: {url}")
+    
+    try:
+        info = get_video_info(url, downloader)
+        containers, qualities = extract_containers_and_qualities(info)
+        
+        result = {
+            'containers': containers,
+            'qualities': qualities
+        }
+        
+        logger.debug(f"Found containers: {containers}, qualities: {qualities}")
+        return result
+    except Exception as e:
+        error_msg = f"Failed to get video formats: {e}"
+        logger.error(error_msg)
+        raise RuntimeError(error_msg)
