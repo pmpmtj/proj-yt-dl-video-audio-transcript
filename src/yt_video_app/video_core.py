@@ -18,6 +18,10 @@ from .video_helpers import (
     get_output_template_with_path,
     get_downloads_directory
 )
+from ..common.app_config import (
+    is_database_source_enabled,
+    is_file_check_enabled
+)
 
 # Initialize logger for this module
 logger = logging.getLogger("video_core")
@@ -300,6 +304,16 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
     
     # Load configuration
     config = _load_download_config(config)
+    
+    # Check feature flags to determine if we should force download
+    if is_database_source_enabled():
+        # Database is single source of truth - always force download
+        force = True
+        logger.info("Database source enabled - forcing download (skipping file existence check)")
+    elif not is_file_check_enabled():
+        # File check disabled globally - force download
+        force = True
+        logger.info("File existence check disabled globally - forcing download")
     
     # Get download settings
     outtmpl, restrict, ext, quality = _get_video_download_settings(config, outtmpl, restrict, ext, quality)

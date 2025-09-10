@@ -21,6 +21,15 @@ from .video_core import (
     get_video_formats
 )
 
+# Import feature flag functions
+from ..common.app_config import (
+    get_feature_flags,
+    is_database_source_enabled,
+    is_file_check_enabled,
+    is_metadata_caching_enabled,
+    is_download_history_enabled
+)
+
 # Import configuration utilities
 from path_utils import load_config
 from .video_helpers import get_default_video_settings
@@ -105,6 +114,11 @@ Examples:
     # Formats subcommand
     formats_parser = subparsers.add_parser('formats', help='Get available video formats and qualities')
     formats_parser.add_argument('url', help='YouTube video URL to get format information from')
+    
+    # Config subcommand
+    config_parser = subparsers.add_parser('config', help='Show current configuration and feature flags')
+    config_parser.add_argument('--feature-flags', action='store_true', 
+                              help='Show only feature flags status')
     
     # For backward compatibility, if no subcommand is provided, treat as download
     args = parser.parse_args()
@@ -288,6 +302,47 @@ class VideoCLIController:
             logger.error(f"Failed to get video formats: {e}")
             print(f"Error getting video formats: {e}")
             raise
+    
+    def handle_config_command(self, show_feature_flags_only: bool = False) -> None:
+        """Handle the config command to display configuration and feature flags.
+        
+        Args:
+            show_feature_flags_only: Whether to show only feature flags
+        """
+        logger.info("Displaying configuration")
+        try:
+            if show_feature_flags_only:
+                print("\n=== Feature Flags Status ===")
+                flags = get_feature_flags()
+                for flag, value in flags.items():
+                    status = "✅ ENABLED" if value else "❌ DISABLED"
+                    print(f"  {flag}: {status}")
+            else:
+                print("\n=== Application Configuration ===")
+                
+                # Show feature flags
+                print("\n--- Feature Flags ---")
+                flags = get_feature_flags()
+                for flag, value in flags.items():
+                    status = "✅ ENABLED" if value else "❌ DISABLED"
+                    print(f"  {flag}: {status}")
+                
+                # Show current behavior
+                print("\n--- Current Behavior ---")
+                if is_database_source_enabled():
+                    print("  📊 Database is the single source of truth")
+                    print("  🔄 File existence check: SKIPPED (always force download)")
+                elif not is_file_check_enabled():
+                    print("  📁 File system is the source of truth")
+                    print("  🔄 File existence check: DISABLED (always force download)")
+                else:
+                    print("  📁 File system is the source of truth")
+                    print("  🔄 File existence check: ENABLED (normal behavior)")
+                
+        except Exception as e:
+            logger.error(f"Failed to get configuration: {e}")
+            print(f"Error getting configuration: {e}")
+            raise
 
     def run(self, args: argparse.Namespace) -> None:
         """Run the CLI workflow with the given arguments.
@@ -330,6 +385,9 @@ class VideoCLIController:
                 
             elif args.command == 'formats':
                 self.handle_formats_command(args.url)
+                
+            elif args.command == 'config':
+                self.handle_config_command(args.feature_flags)
                 
             else:
                 print(f"Unknown command: {args.command}")
