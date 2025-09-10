@@ -87,6 +87,10 @@ Examples:
     download_parser.add_argument('--quality', choices=['best','2160p','1440p','1080p','720p','480p','360p','144p'], 
                                default=video_settings['quality'], 
                                help=f'Target video quality (cap). Default: {video_settings["quality"]}.')
+    download_parser.add_argument('--audio-lang', type=str, default='original',
+                               help='Audio language code (use "languages" command to see available options). Default: original.')
+    download_parser.add_argument('--subtitle-lang', type=str, default=None,
+                               help='Subtitle language code to embed (use "languages" command to see available options). Default: none.')
     
     # Info subcommand
     info_parser = subparsers.add_parser('info', help='Get video metadata information')
@@ -170,6 +174,7 @@ class VideoCLIController:
     
     def handle_video_download(self, url: str, output_template: Optional[str], 
                             restrict_filenames: bool, ext: str, quality: str,
+                            audio_lang: str, subtitle_lang: Optional[str],
                             config: Optional[Dict[str, Any]]) -> Optional[str]:
         """Handle video download workflow.
         
@@ -179,6 +184,8 @@ class VideoCLIController:
             restrict_filenames: Whether to restrict filenames to ASCII
             ext: Container extension
             quality: Quality setting
+            audio_lang: Audio language code
+            subtitle_lang: Subtitle language code (optional)
             config: Configuration dictionary
             
         Returns:
@@ -191,6 +198,8 @@ class VideoCLIController:
             restrict_filenames, 
             ext, 
             quality,
+            audio_lang,
+            subtitle_lang,
             progress_callback=self.progress_hook,
             config=config
         )
@@ -302,6 +311,8 @@ class VideoCLIController:
                     args.restrict_filenames, 
                     args.ext, 
                     args.quality,
+                    args.audio_lang,
+                    args.subtitle_lang,
                     config
                 )
                 print(f"\nVideo download completed: {path or 'failed'}")

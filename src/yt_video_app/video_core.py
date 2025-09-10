@@ -36,7 +36,8 @@ def default_video_progress_hook(d):
 
 # --- Format Selection Logic ---------------------------------------------------
 
-def _fmt_for(ext: str, quality: Optional[str]) -> str:
+def _fmt_for(ext: str, quality: Optional[str], audio_lang: str = 'original', 
+             subtitle_lang: Optional[str] = None) -> str:
     """Build a strict yt-dlp format string so merges don't fail.
     
     - For webm: pick VP9/AV1 + Opus/Vorbis (both *.webm).
@@ -46,6 +47,8 @@ def _fmt_for(ext: str, quality: Optional[str]) -> str:
     Args:
         ext: Container extension ('mp4' or 'webm')
         quality: Quality setting ('best' or height like '1080p')
+        audio_lang: Audio language code ('original' for default, or specific language code)
+        subtitle_lang: Subtitle language code to embed (optional)
         
     Returns:
         yt-dlp format string
@@ -57,11 +60,17 @@ def _fmt_for(ext: str, quality: Optional[str]) -> str:
     else:
         height = ''
 
+    # Build audio language filter
+    if audio_lang == 'original':
+        audio_lang_filter = ""
+    else:
+        audio_lang_filter = f"[language={audio_lang}]"
+
     if ext == 'webm':
         # Prefer separate A/V in webm, else progressive webm — no other fallback
-        return f"bestvideo[ext=webm]{height}+bestaudio[ext=webm]/best[ext=webm]{height}"
+        return f"bestvideo[ext=webm]{height}+bestaudio[ext=webm]{audio_lang_filter}/best[ext=webm]{height}"
     # mp4 path
-    return f"bestvideo[ext=mp4]{height}+bestaudio[ext=m4a]/best[ext=mp4]{height}"
+    return f"bestvideo[ext=mp4]{height}+bestaudio[ext=m4a]{audio_lang_filter}/best[ext=mp4]{height}"
 
 
 # --- Configuration and Setup Functions ----------------------------------------
@@ -118,6 +127,7 @@ def _get_video_download_settings(config: Dict[str, Any], outtmpl: Optional[str] 
 
 
 def _create_video_ydl_options(outtmpl: str, restrict: bool, ext: str, quality: str,
+                             audio_lang: str = 'original', subtitle_lang: Optional[str] = None,
                              progress_callback: Optional[Callable] = None) -> Dict[str, Any]:
     """Create yt-dlp options for video download.
     
@@ -126,6 +136,8 @@ def _create_video_ydl_options(outtmpl: str, restrict: bool, ext: str, quality: s
         restrict: Whether to restrict filenames to ASCII
         ext: Container extension
         quality: Quality setting
+        audio_lang: Audio language code
+        subtitle_lang: Subtitle language code (optional)
         progress_callback: Optional progress callback function
         
     Returns:
@@ -134,18 +146,71 @@ def _create_video_ydl_options(outtmpl: str, restrict: bool, ext: str, quality: s
     progress_hooks = [progress_callback] if progress_callback else [default_video_progress_hook]
     
     merge_ext = ext if ext in ('mp4', 'webm') else 'mp4'
-    format_string = _fmt_for(merge_ext, quality)
+    format_string = _fmt_for(merge_ext, quality, audio_lang, subtitle_lang)
     logger.debug(f"Using format string: {format_string}")
     
-    return {
+    # Modify output template to include language information
+    modified_outtmpl = _modify_output_template(outtmpl, audio_lang, subtitle_lang)
+    logger.debug(f"Modified output template: {modified_outtmpl}")
+    
+    # Build base options
+    options = {
         'format': format_string,
         'merge_output_format': merge_ext,
-        'outtmpl': outtmpl,
+        'outtmpl': modified_outtmpl,
         'restrictfilenames': restrict,
         'progress_hooks': progress_hooks,
         'quiet': False,
         'no_warnings': False,
     }
+    
+    # Add subtitle options if requested
+    if subtitle_lang:
+        options.update({
+            'writesubtitles': True,
+            'writeautomaticsub': True,
+            'subtitleslangs': [subtitle_lang],
+            'embedsubtitles': True,
+        })
+        logger.debug(f"Added subtitle options for language: {subtitle_lang}")
+    
+    return options
+
+
+def _modify_output_template(outtmpl: str, audio_lang: str = 'original', 
+                           subtitle_lang: Optional[str] = None) -> str:
+    """Modify output template to include language information.
+    
+    Args:
+        outtmpl: Original output template
+        audio_lang: Audio language code
+        subtitle_lang: Subtitle language code (optional)
+        
+    Returns:
+        Modified output template with language suffix
+    """
+    # Build language suffix
+    lang_parts = []
+    
+    # Add audio language if not original
+    if audio_lang != 'original':
+        lang_parts.append(f"audio-{audio_lang}")
+    
+    # Add subtitle language if specified
+    if subtitle_lang:
+        lang_parts.append(f"sub-{subtitle_lang}")
+    
+    # Create language suffix
+    if lang_parts:
+        lang_suffix = "_" + "_".join(lang_parts)
+        # Insert language suffix before the file extension
+        if '.' in outtmpl:
+            base, ext = outtmpl.rsplit('.', 1)
+            return f"{base}{lang_suffix}.{ext}"
+        else:
+            return f"{outtmpl}{lang_suffix}"
+    else:
+        return outtmpl
 
 
 def _extract_expected_filename(ydl, info: Dict[str, Any], file_extension: str) -> str:
@@ -207,7 +272,8 @@ def _perform_download(ydl, url: str, expected_path: str, file_checker: Callable)
 
 def download_video_with_audio(url: str, outtmpl: Optional[str] = None, 
                             restrict: Optional[bool] = None, ext: Optional[str] = None, 
-                            quality: Optional[str] = None,
+                            quality: Optional[str] = None, audio_lang: str = 'original',
+                            subtitle_lang: Optional[str] = None,
                             progress_callback: Optional[Callable] = None,
                             config: Optional[Dict[str, Any]] = None,
                             downloader=None, file_checker=None) -> Optional[str]:
@@ -219,6 +285,8 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         restrict: Whether to restrict filenames to ASCII (uses config default if None)
         ext: Container extension ('mp4' or 'webm') (uses config default if None)
         quality: Quality setting ('best' or height like '1080p') (uses config default if None)
+        audio_lang: Audio language code ('original' for default, or specific language code)
+        subtitle_lang: Subtitle language code to embed (optional)
         progress_callback: Optional progress callback function
         config: Configuration dictionary (loads from file if None)
         downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
@@ -242,7 +310,7 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         file_checker = os.path.exists
     
     # Create yt-dlp options
-    ydl_opts = _create_video_ydl_options(outtmpl, restrict, ext, quality, progress_callback)
+    ydl_opts = _create_video_ydl_options(outtmpl, restrict, ext, quality, audio_lang, subtitle_lang, progress_callback)
     logger.debug(f"yt-dlp options: {ydl_opts}")
     
     # Get video information using shared function
