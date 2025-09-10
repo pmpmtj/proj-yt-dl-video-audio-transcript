@@ -23,6 +23,9 @@ from ..common.app_config import (
     is_file_check_enabled
 )
 
+# Import multiuser support
+from ..common.user_context import UserContext
+
 # Initialize logger for this module
 logger = logging.getLogger("video_core")
 
@@ -280,7 +283,8 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
                             subtitle_lang: Optional[str] = None, force: bool = False,
                             progress_callback: Optional[Callable] = None,
                             config: Optional[Dict[str, Any]] = None,
-                            downloader=None, file_checker=None) -> Optional[str]:
+                            downloader=None, file_checker=None,
+                            user_context: Optional[UserContext] = None) -> Optional[str]:
     """Download video+audio and merge to the chosen container without re-encoding.
     
     Args:
@@ -296,6 +300,7 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         config: Configuration dictionary (loads from file if None)
         downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
         file_checker: Function to check if file exists (defaults to os.path.exists)
+        user_context: User context for multiuser support (optional)
         
     Returns:
         Path to downloaded video file, or None if failed
@@ -317,6 +322,11 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
     
     # Get download settings
     outtmpl, restrict, ext, quality = _get_video_download_settings(config, outtmpl, restrict, ext, quality)
+    
+    # Use multiuser path if user context provided
+    if user_context and outtmpl is None:
+        outtmpl = get_output_template_with_path(config, user_context=user_context, video_url=url)
+        logger.debug(f"Using multiuser output template: {outtmpl}")
     
     # Set up dependencies
     if downloader is None:

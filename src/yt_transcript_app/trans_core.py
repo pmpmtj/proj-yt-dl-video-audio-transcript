@@ -23,6 +23,9 @@ from .get_transcript_list import get_transcript_list, list_transcript_metadata, 
 from ..common.logging_config import setup_logging
 from path_utils.path_utils import resolve_path, ensure_directory, get_script_directories
 
+# Import multiuser support
+from ..common.user_context import UserContext
+
 # Initialize logger for this module
 logger = logging.getLogger("trans_core")
 
@@ -81,25 +84,36 @@ def extract_video_id(url: str) -> Optional[str]:
 
 
 def get_transcript_output_template(custom_path: Optional[str] = None, 
-                                 template: Optional[str] = None) -> str:
+                                 template: Optional[str] = None,
+                                 user_context: Optional[UserContext] = None,
+                                 video_url: Optional[str] = None) -> str:
     """
     Get output template for transcript files.
     
     Args:
         custom_path: Custom download directory
         template: Custom filename template
+        user_context: User context for multiuser support (optional)
+        video_url: Video URL for user-specific path (required if user_context provided)
         
     Returns:
         Output template string
     """
-    # Get script directories
-    _, base_dir = get_script_directories()
-    
-    # Determine download directory
-    if custom_path:
-        download_path = resolve_path(custom_path, base_dir)
+    # Use multiuser path if user context and video URL provided
+    if user_context and video_url:
+        download_path = user_context.get_transcript_download_path(video_url)
+        logger.debug(f"Using multiuser transcript path: {download_path}")
     else:
-        download_path = base_dir / "downloads" / "transcripts"
+        # Get script directories
+        _, base_dir = get_script_directories()
+        
+        # Determine download directory
+        if custom_path:
+            download_path = resolve_path(custom_path, base_dir)
+        else:
+            download_path = base_dir / "downloads" / "transcripts"
+        
+        logger.debug(f"Using single-user transcript path: {download_path}")
     
     ensure_directory(download_path)
     
@@ -226,7 +240,8 @@ def download_transcript(url: str,
                        formats: Optional[List[str]] = None,
                        include_metadata: bool = True,
                        progress_callback: Optional[Callable] = None,
-                       file_checker: Callable = None) -> Dict[str, str]:
+                       file_checker: Callable = None,
+                       user_context: Optional[UserContext] = None) -> Dict[str, str]:
     """
     Download transcript from YouTube URL with multiple format support.
     
@@ -245,6 +260,7 @@ def download_transcript(url: str,
         include_metadata: Whether to include rich metadata analysis
         progress_callback: Optional progress callback function
         file_checker: Function to check if file exists (defaults to os.path.exists)
+        user_context: User context for multiuser support (optional)
         
     Returns:
         Dictionary with format names as keys and file paths as values
@@ -276,7 +292,11 @@ def download_transcript(url: str,
     
     # Get output template
     if output_template is None:
-        output_template = get_transcript_output_template(custom_download_path)
+        output_template = get_transcript_output_template(
+            custom_download_path, 
+            user_context=user_context, 
+            video_url=url
+        )
         logger.debug(f"Using output template: {output_template}")
     
     # Set default formats

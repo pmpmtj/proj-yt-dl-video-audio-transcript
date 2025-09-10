@@ -34,6 +34,9 @@ from ..common.app_config import (
 from path_utils import load_config
 from .video_helpers import get_default_video_settings
 
+# Import multiuser support
+from ..common.user_context import UserContext, create_user_context
+
 # Initialize logger for this module
 logger = logging.getLogger("video_cli")
 
@@ -102,6 +105,8 @@ Examples:
                                help='Subtitle language code to embed (use "languages" command to see available options). Default: none.')
     download_parser.add_argument('--force', action='store_true',
                                help='Force download even if file already exists. Skips file existence check.')
+    download_parser.add_argument('--session-id',
+                               help='Session ID for multiuser support (creates new session if not provided)')
     
     # Info subcommand
     info_parser = subparsers.add_parser('info', help='Get video metadata information')
@@ -143,7 +148,8 @@ class VideoCLIController:
                  config_loader: Optional[Callable] = None,
                  video_settings_loader: Optional[Callable] = None,
                  video_downloader: Optional[Callable] = None,
-                 progress_hook: Optional[Callable] = None):
+                 progress_hook: Optional[Callable] = None,
+                 user_context: Optional[UserContext] = None):
         """Initialize video CLI controller with optional dependencies for testing.
         
         Args:
@@ -151,11 +157,13 @@ class VideoCLIController:
             video_settings_loader: Function to load video settings (defaults to get_default_video_settings)
             video_downloader: Function to download video (defaults to download_video_with_audio)
             progress_hook: Progress callback function (defaults to default_video_progress_hook)
+            user_context: User context for multiuser support (optional)
         """
         self.config_loader = config_loader or load_config
         self.video_settings_loader = video_settings_loader or get_default_video_settings
         self.video_downloader = video_downloader or download_video_with_audio
         self.progress_hook = progress_hook or default_video_progress_hook
+        self.user_context = user_context
     
     def load_configuration(self) -> tuple[Optional[Dict[str, Any]], Dict[str, Any]]:
         """Load configuration and video settings.
@@ -191,7 +199,8 @@ class VideoCLIController:
     def handle_video_download(self, url: str, output_template: Optional[str], 
                             restrict_filenames: bool, ext: str, quality: str,
                             audio_lang: str, subtitle_lang: Optional[str],
-                            force: bool, config: Optional[Dict[str, Any]]) -> Optional[str]:
+                            force: bool, config: Optional[Dict[str, Any]],
+                            session_id: Optional[str] = None) -> Optional[str]:
         """Handle video download workflow.
         
         Args:
@@ -204,11 +213,22 @@ class VideoCLIController:
             subtitle_lang: Subtitle language code (optional)
             force: Whether to force download even if file exists
             config: Configuration dictionary
+            session_id: Session ID for multiuser support
             
         Returns:
             Path to downloaded video file, or None if failed
         """
         logger.info("Starting video download")
+        
+        # Create or use user context for multiuser support
+        user_context = self.user_context
+        if session_id:
+            user_context = create_user_context(session_id)
+            logger.info(f"Using provided session ID: {session_id}")
+        elif not user_context:
+            user_context = create_user_context()
+            logger.info(f"Created new session: {user_context.get_session_id()}")
+        
         path = self.video_downloader(
             url, 
             output_template, 
@@ -219,7 +239,8 @@ class VideoCLIController:
             subtitle_lang,
             force,
             progress_callback=self.progress_hook,
-            config=config
+            config=config,
+            user_context=user_context
         )
         logger.info(f"Video download completed: {path or 'failed'}")
         return path
@@ -373,9 +394,12 @@ class VideoCLIController:
                     args.audio_lang,
                     args.subtitle_lang,
                     args.force,
-                    config
+                    config,
+                    args.session_id
                 )
                 print(f"\nVideo download completed: {path or 'failed'}")
+                if self.user_context or args.session_id:
+                    print(f"Session ID: {self.user_context.get_session_id() if self.user_context else 'N/A'}")
                 
             elif args.command == 'info':
                 self.handle_info_command(args.url)

@@ -15,6 +15,9 @@ from path_utils import resolve_path, ensure_directory, get_script_directories
 # Import the new Python configuration
 from ..common.app_config import get_config, get_download_config, get_video_config, get_download_path, get_video_settings
 
+# Import multiuser support
+from ..common.user_context import UserContext
+
 # Initialize logger for this module
 logger = logging.getLogger("video_helpers")
 
@@ -66,18 +69,28 @@ def get_default_video_settings(config: Optional[Dict[str, Any]] = None) -> Dict[
 
 
 def get_output_template_with_path(config: Optional[Dict[str, Any]] = None, 
-                                 custom_template: Optional[str] = None) -> str:
+                                 custom_template: Optional[str] = None,
+                                 user_context: Optional[UserContext] = None,
+                                 video_url: Optional[str] = None) -> str:
     """
     Get complete output template including the download path.
     
     Args:
         config: Configuration dictionary (loads from Python module if None)
         custom_template: Custom template to use instead of config default
+        user_context: User context for multiuser support (optional)
+        video_url: Video URL for user-specific path (required if user_context provided)
         
     Returns:
         Complete output template with path
     """
-    download_path = get_downloads_directory(config)
+    # Use multiuser path if user context and video URL provided
+    if user_context and video_url:
+        download_path = user_context.get_video_download_path(video_url)
+        logger.debug(f"Using multiuser video path: {download_path}")
+    else:
+        download_path = get_downloads_directory(config)
+        logger.debug(f"Using single-user video path: {download_path}")
     
     if custom_template:
         template = custom_template

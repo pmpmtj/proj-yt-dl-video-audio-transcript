@@ -20,6 +20,9 @@ from .audio_core import (
 # Import audio helpers
 from .audio_helpers import get_audio_output_template
 
+# Import multiuser support
+from ..common.user_context import UserContext, create_user_context
+
 # Initialize logger for this module
 logger = logging.getLogger("audio_cli")
 
@@ -73,6 +76,11 @@ Examples:
         help='Suppress progress output'
     )
     
+    parser.add_argument(
+        '--session-id',
+        help='Session ID for multiuser support (creates new session if not provided)'
+    )
+    
     args = parser.parse_args()
     
     # Check if URL is provided (unless showing help)
@@ -80,7 +88,8 @@ Examples:
         parser.error("URL is required. Use --help for usage information.")
     
     logger.info(f"Parsed arguments: URL={args.url}, output_dir={args.output_dir}, "
-               f"template={args.template}, metadata={args.metadata}, quiet={args.quiet}")
+               f"template={args.template}, metadata={args.metadata}, quiet={args.quiet}, "
+               f"session_id={args.session_id}")
     return args
 
 
@@ -92,7 +101,8 @@ class AudioCLIController:
     def __init__(self, 
                  audio_downloader: Optional[Callable] = None,
                  metadata_extractor: Optional[Callable] = None,
-                 progress_hook: Optional[Callable] = None):
+                 progress_hook: Optional[Callable] = None,
+                 user_context: Optional[UserContext] = None):
         """
         Initialize audio CLI controller with optional dependencies for testing.
         
@@ -100,10 +110,12 @@ class AudioCLIController:
             audio_downloader: Function to download audio (defaults to download_audio_mp3)
             metadata_extractor: Function to extract metadata (defaults to get_audio_metadata)
             progress_hook: Progress callback function (defaults to default_audio_progress_hook)
+            user_context: User context for multiuser support (optional)
         """
         self.audio_downloader = audio_downloader or download_audio_mp3
         self.metadata_extractor = metadata_extractor or get_audio_metadata
         self.progress_hook = progress_hook or default_audio_progress_hook
+        self.user_context = user_context
     
     def handle_metadata_request(self, url: str) -> None:
         """
@@ -134,7 +146,8 @@ class AudioCLIController:
             raise
     
     def handle_audio_download(self, url: str, output_dir: Optional[str], 
-                            template: Optional[str], quiet: bool) -> str:
+                            template: Optional[str], quiet: bool, 
+                            session_id: Optional[str] = None) -> str:
         """
         Handle audio download workflow.
         
@@ -143,11 +156,21 @@ class AudioCLIController:
             output_dir: Custom output directory
             template: Custom filename template
             quiet: Whether to suppress progress output
+            session_id: Session ID for multiuser support
             
         Returns:
             Path to downloaded audio file
         """
         logger.info("Handling audio download request")
+        
+        # Create or use user context for multiuser support
+        user_context = self.user_context
+        if session_id:
+            user_context = create_user_context(session_id)
+            logger.info(f"Using provided session ID: {session_id}")
+        elif not user_context:
+            user_context = create_user_context()
+            logger.info(f"Created new session: {user_context.get_session_id()}")
         
         # Determine output template
         if template:
@@ -160,11 +183,19 @@ class AudioCLIController:
                 ensure_directory(download_path)
                 output_template = str(download_path / template)
             else:
-                # Use default audio directory with custom template
-                output_template = get_audio_output_template(template=template)
+                # Use multiuser or default audio directory with custom template
+                output_template = get_audio_output_template(
+                    template=template, 
+                    user_context=user_context, 
+                    video_url=url
+                )
         else:
-            # Use default template with custom or default directory
-            output_template = get_audio_output_template(custom_path=output_dir)
+            # Use default template with custom or multiuser directory
+            output_template = get_audio_output_template(
+                custom_path=output_dir,
+                user_context=user_context,
+                video_url=url
+            )
         
         logger.debug(f"Using output template: {output_template}")
         
@@ -175,7 +206,8 @@ class AudioCLIController:
         path = self.audio_downloader(
             url,
             output_template=output_template,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            user_context=user_context
         )
         
         logger.info(f"Audio download completed: {path}")
@@ -212,9 +244,12 @@ class AudioCLIController:
                     args.url,
                     args.output_dir,
                     args.template,
-                    args.quiet
+                    args.quiet,
+                    args.session_id
                 )
                 print(f"\nAudio download completed: {path}")
+                if self.user_context or args.session_id:
+                    print(f"Session ID: {self.user_context.get_session_id() if self.user_context else 'N/A'}")
                 
         except Exception as e:
             self.handle_download_error(e)

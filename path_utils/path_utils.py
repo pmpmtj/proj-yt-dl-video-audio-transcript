@@ -8,6 +8,7 @@ Handles both frozen (PyInstaller) and regular Python execution.
 
 import sys
 import logging
+import uuid
 from pathlib import Path
 from typing import Union, Optional, Dict, Any
 
@@ -97,3 +98,76 @@ def ensure_directory(path: Union[str, Path]) -> Path:
     dir_path = Path(path)
     dir_path.mkdir(parents=True, exist_ok=True)
     return dir_path
+
+
+# --- Multiuser Session Management Functions ---------------------------------
+
+def generate_session_uuid() -> str:
+    """
+    Generate a unique session identifier for multiuser support.
+    
+    Returns:
+        String representation of a UUID4
+    """
+    session_id = str(uuid.uuid4())
+    logger.debug(f"Generated session UUID: {session_id}")
+    return session_id
+
+
+def generate_video_uuid() -> str:
+    """
+    Generate a unique video identifier for multiuser support.
+    
+    Returns:
+        String representation of a UUID4
+    """
+    video_id = str(uuid.uuid4())
+    logger.debug(f"Generated video UUID: {video_id}")
+    return video_id
+
+
+def create_download_structure(base_dir: Union[str, Path], session_uuid: str, 
+                            video_uuid: str, media_type: str) -> Path:
+    """
+    Create the download directory structure for multiuser support.
+    
+    Creates a hierarchical structure: base_dir/session_uuid/video_uuid/media_type/
+    
+    Args:
+        base_dir: Base downloads directory
+        session_uuid: Session identifier (user session)
+        video_uuid: Video identifier (unique per video download)
+        media_type: Media type (audio, video, transcripts)
+    
+    Returns:
+        Path to the created directory
+        
+    Example:
+        create_download_structure("./downloads", "session-123", "video-456", "audio")
+        # Returns: Path("./downloads/session-123/video-456/audio")
+    """
+    download_path = Path(base_dir) / session_uuid / video_uuid / media_type
+    created_path = ensure_directory(download_path)
+    logger.debug(f"Created download structure: {created_path}")
+    return created_path
+
+
+def get_user_download_path(session_uuid: str, video_uuid: str, media_type: str, 
+                          base_dir: Optional[Union[str, Path]] = None) -> Path:
+    """
+    Get the user-specific download path for a given session and video.
+    
+    Args:
+        session_uuid: Session identifier (user session)
+        video_uuid: Video identifier (unique per video download)
+        media_type: Media type (audio, video, transcripts)
+        base_dir: Base downloads directory (uses config default if None)
+    
+    Returns:
+        Path to the user-specific download directory
+    """
+    if base_dir is None:
+        config = get_config()
+        base_dir = config.get("download", {}).get("download_path", "downloads")
+    
+    return create_download_structure(base_dir, session_uuid, video_uuid, media_type)

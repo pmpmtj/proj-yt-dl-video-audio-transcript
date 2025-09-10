@@ -12,6 +12,9 @@ from typing import Optional, Dict, Any
 # Import generic utilities
 from path_utils import resolve_path, ensure_directory, get_script_directories
 
+# Import multiuser support
+from ..common.user_context import UserContext
+
 # Initialize logger for this module
 logger = logging.getLogger("audio_helpers")
 
@@ -47,18 +50,28 @@ def get_audio_downloads_directory(custom_path: Optional[str] = None) -> Path:
 
 
 def get_audio_output_template(custom_path: Optional[str] = None, 
-                            custom_template: Optional[str] = None) -> str:
+                            custom_template: Optional[str] = None,
+                            user_context: Optional[UserContext] = None,
+                            video_url: Optional[str] = None) -> str:
     """
     Get complete output template for audio files including the download path.
     
     Args:
         custom_path: Custom download path
         custom_template: Custom template to use instead of default
+        user_context: User context for multiuser support (optional)
+        video_url: Video URL for user-specific path (required if user_context provided)
         
     Returns:
         Complete output template with path
     """
-    download_path = get_audio_downloads_directory(custom_path)
+    # Use multiuser path if user context and video URL provided
+    if user_context and video_url:
+        download_path = user_context.get_audio_download_path(video_url)
+        logger.debug(f"Using multiuser audio path: {download_path}")
+    else:
+        download_path = get_audio_downloads_directory(custom_path)
+        logger.debug(f"Using single-user audio path: {download_path}")
     
     if custom_template:
         template = custom_template

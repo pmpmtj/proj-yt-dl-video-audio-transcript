@@ -1,9 +1,10 @@
-# YouTube Downloader - Separated Audio and Video Apps
+# YouTube Downloader - Audio, Video, and Transcript Apps
 
-A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, production-ready architecture. The project has been separated into two focused applications:
+A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, production-ready architecture and multiuser support. The project consists of three focused applications:
 
 - **Audio Downloader** (`yt_audio_app`): Simple, hardcoded MP3 downloads
 - **Video Downloader** (`yt_video_app`): Configurable video downloads with quality/format options
+- **Transcript Downloader** (`yt_transcript_app`): Download transcripts with multiple format support
 
 ## Features
 
@@ -26,16 +27,35 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 - **Comprehensive Logging**: Centralized logging with hybrid approach
 - **Organized Output**: Downloads to `downloads/video/` directory
 
+### Transcript Downloader (`yt_transcript_app`)
+- **Multiple Formats**: Clean text, timestamped, and structured JSON outputs
+- **Rich Metadata**: Comprehensive metadata collection and analysis
+- **Chapter Detection**: Automatic chapter detection and content analysis
+- **Multiple Export Formats**: JSON, CSV, and Markdown metadata exports
+- **Language Support**: Auto-detect or specify transcript language
+- **Preview Mode**: Preview transcript content without downloading
+- **Metadata Analysis**: Rich content analysis and statistics
+- **Organized Output**: Downloads to `downloads/transcripts/` directory
+
+### Multiuser Support
+- **Session-Based**: No database required - uses UUID-based sessions
+- **User Isolation**: Each user gets separate download directories
+- **Backward Compatible**: Existing single-user code works unchanged
+- **Web-Ready**: Perfect foundation for web app development
+- **Session Management**: Automatic session creation and tracking
+- **Isolated Downloads**: Users can only access their own downloads
+
 ### Shared Features
 - **Modular Design**: Clean separation of concerns
 - **Cross-Platform**: Works on Windows, macOS, and Linux
-- **Comprehensive Testing**: Full test coverage for both apps
+- **Comprehensive Testing**: Full test coverage for all apps
 - **Production-Ready**: Error handling, logging, and robust architecture
 
 ## Requirements
 
 * Python 3.8+
 * `pip install yt-dlp`
+* `pip install youtube-transcript-api` (for transcript downloads)
 * **FFmpeg** in PATH (needed for video merging/remuxing)
 
 ## Installation
@@ -111,6 +131,53 @@ python -m src.yt_video_app formats "URL"
 python -m src.yt_video_app config
 ```
 
+### Transcript Downloader
+
+Download transcripts with multiple format support and rich metadata:
+
+```bash
+# Basic transcript download (all formats)
+python -m src.yt_transcript_app "https://www.youtube.com/watch?v=VIDEO_ID"
+
+# Custom output directory
+python -m src.yt_transcript_app "URL" --output-dir ./transcripts
+
+# Custom filename template
+python -m src.yt_transcript_app "URL" --template "my_transcript"
+
+# Specific language
+python -m src.yt_transcript_app "URL" --language en
+
+# Specific formats only
+python -m src.yt_transcript_app "URL" --formats clean structured
+
+# Skip rich metadata analysis
+python -m src.yt_transcript_app "URL" --no-metadata
+
+# Show transcript metadata without downloading
+python -m src.yt_transcript_app "URL" --metadata
+
+# Preview transcript content
+python -m src.yt_transcript_app "URL" --preview
+
+# Quiet mode (no progress output)
+python -m src.yt_transcript_app "URL" --quiet
+```
+
+### Multiuser Mode
+
+All apps support multiuser functionality with session isolation:
+
+```bash
+# Each user gets isolated downloads
+python -m src.yt_audio_app "URL" --session-id "user-123"
+python -m src.yt_video_app download "URL" --session-id "user-456"
+python -m src.yt_transcript_app "URL" --session-id "user-789"
+
+# Without session ID, creates new session automatically
+python -m src.yt_audio_app "URL"  # Creates new session
+```
+
 ### Command Line Options
 
 #### Audio Downloader Options
@@ -119,6 +186,7 @@ python -m src.yt_video_app config
 * `--template, -t` — filename template (default: %(title)s.%(ext)s)
 * `--metadata, -m` — show video metadata without downloading
 * `--quiet, -q` — suppress progress output
+* `--session-id` — session ID for multiuser support
 
 #### Video Downloader Commands
 
@@ -131,6 +199,7 @@ python -m src.yt_video_app config
 * `--audio-lang` — audio language code (default: original)
 * `--subtitle-lang` — subtitle language code to embed (optional)
 * `--force` — force download even if file exists
+* `--session-id` — session ID for multiuser support
 
 **Info Command:**
 * `url` *(positional)* — the video URL
@@ -143,6 +212,18 @@ python -m src.yt_video_app config
 
 **Config Command:**
 * `--feature-flags` — show only feature flags status
+
+#### Transcript Downloader Options
+* `url` *(positional)* — the video URL
+* `--output-dir, -o` — output directory (default: ./downloads/transcripts)
+* `--template, -t` — filename template (default: transcript)
+* `--language, -l` — language code (auto-detects if not provided)
+* `--formats, -f` — formats to generate: clean, timestamped, structured (default: all)
+* `--no-metadata` — skip rich metadata analysis
+* `--metadata, -m` — show transcript metadata without downloading
+* `--preview, -p` — preview transcript content without downloading
+* `--quiet, -q` — suppress progress output
+* `--session-id` — session ID for multiuser support
 
 ## Configuration
 
@@ -238,13 +319,29 @@ my_project/
 │   │   ├── video_core.py       # Video download logic
 │   │   ├── video_cli.py        # Video CLI interface
 │   │   └── video_helpers.py    # Video-specific helpers
+│   ├── yt_transcript_app/      # Transcript downloader
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── trans_core.py       # Transcript download logic
+│   │   ├── trans_cli.py        # Transcript CLI interface
+│   │   ├── transcript_processor.py
+│   │   ├── metadata_collector.py
+│   │   ├── metadata_exporter.py
+│   │   └── get_transcript_list.py
 │   └── common/                 # Shared utilities
-│       ├── app_config.py       # Video app configuration
-│       └── logging_config.py   # Shared logging configuration
+│       ├── app_config.py       # App configuration
+│       ├── logging_config.py   # Shared logging configuration
+│       └── user_context.py     # Multiuser session management
 ├── path_utils/                 # Shared path utilities
-├── downloads/                  # Download directories
-│   ├── audio/                  # Audio downloads (MP3 files)
-│   └── video/                  # Video downloads (MP4/WebM files)
+├── downloads/                  # Download directories (multiuser structure)
+│   ├── session-uuid-1/         # User session 1
+│   │   └── video-uuid-1/       # Video 1
+│   │       ├── audio/          # Audio downloads
+│   │       ├── video/          # Video downloads
+│   │       └── transcripts/    # Transcript downloads
+│   └── session-uuid-2/         # User session 2
+│       └── video-uuid-2/       # Video 2
+│           └── audio/          # Audio downloads
 ├── tests/
 │   ├── test_audio_app/         # Audio app tests
 │   │   ├── test_audio_core.py
@@ -255,6 +352,7 @@ my_project/
 │   │   ├── test_video_cli.py
 │   │   └── test_video_helpers.py
 │   └── test_path_utils.py      # Shared utility tests
+├── test_multiuser.py          # Multiuser functionality test
 ├── requirements.txt
 └── README.md
 ```
@@ -273,6 +371,18 @@ my_project/
 - **Production-Ready**: Comprehensive error handling and logging
 - **Extensible**: Easy to add new features and options
 
+### Transcript App Architecture
+- **Rich Processing**: Multiple format outputs with metadata analysis
+- **Language Support**: Auto-detection and manual language selection
+- **Export Options**: JSON, CSV, and Markdown metadata exports
+- **Preview Mode**: Content preview without full download
+
+### Multiuser Architecture
+- **Session-Based**: UUID-based user sessions without database
+- **User Isolation**: Separate directories for each user session
+- **Backward Compatible**: Existing code works unchanged
+- **Web-Ready**: Perfect foundation for web application development
+
 ### Shared Architecture
 - **Modular Design**: Clean separation between core logic, CLI, and helpers
 - **Dependency Injection**: Easy testing with mocked dependencies
@@ -281,7 +391,7 @@ my_project/
 
 ## Testing
 
-Both apps include comprehensive unit tests:
+All apps include comprehensive unit tests:
 
 ### Running Tests
 
@@ -295,6 +405,9 @@ python -m pytest tests/test_audio_app/ -v
 # Run video app tests only
 python -m pytest tests/test_video_app/ -v
 
+# Run transcript app tests only
+python -m pytest tests/test_transcript_app/ -v
+
 # Run with coverage
 python -m pytest tests/ --cov=src --cov-report=html
 ```
@@ -303,9 +416,26 @@ python -m pytest tests/ --cov=src --cov-report=html
 
 * **Audio App**: Core download functions, CLI interface, helper functions
 * **Video App**: Core download functions, CLI interface, helper functions, metadata extraction
+* **Transcript App**: Core download functions, CLI interface, helper functions, metadata processing
+* **Multiuser Support**: Session management, user isolation, directory structure
 * **Shared Utilities**: Path handling, configuration management
 * **Error Scenarios**: Download failures, invalid URLs, missing files
 * **Fast Execution**: All tests run with mocked dependencies (no network calls)
+
+### Multiuser Testing
+
+Test multiuser functionality with the provided test script:
+
+```bash
+# Test multiuser functionality
+python test_multiuser.py
+```
+
+This will demonstrate:
+- Session-based user isolation
+- Directory structure creation
+- Multiple users downloading different content types
+- File organization and access control
 
 ## Logging
 
@@ -342,6 +472,9 @@ python -m src.yt_audio_app "URL" --template "%(uploader)s - %(title)s.%(ext)s"
 
 # Show video info without downloading
 python -m src.yt_audio_app "URL" --metadata
+
+# Multiuser mode with session ID
+python -m src.yt_audio_app "URL" --session-id "user-123"
 ```
 
 ### Video Download Examples
@@ -387,6 +520,51 @@ python -m src.yt_video_app info "URL"
 
 # Show current configuration
 python -m src.yt_video_app config
+
+# Multiuser mode with session ID
+python -m src.yt_video_app download "URL" --session-id "user-456"
+```
+
+### Transcript Download Examples
+
+```bash
+# Download all transcript formats
+python -m src.yt_transcript_app "https://youtu.be/dQw4w9WgXcQ"
+
+# Download specific formats only
+python -m src.yt_transcript_app "URL" --formats clean structured
+
+# Download with specific language
+python -m src.yt_transcript_app "URL" --language en
+
+# Preview transcript without downloading
+python -m src.yt_transcript_app "URL" --preview
+
+# Show transcript metadata
+python -m src.yt_transcript_app "URL" --metadata
+
+# Custom output directory
+python -m src.yt_transcript_app "URL" --output-dir ./my_transcripts
+
+# Skip rich metadata analysis
+python -m src.yt_transcript_app "URL" --no-metadata
+
+# Multiuser mode with session ID
+python -m src.yt_transcript_app "URL" --session-id "user-789"
+```
+
+### Multiuser Examples
+
+```bash
+# Different users downloading same video
+python -m src.yt_audio_app "URL" --session-id "alice"
+python -m src.yt_video_app download "URL" --session-id "bob"
+python -m src.yt_transcript_app "URL" --session-id "charlie"
+
+# Same user downloading different content types
+python -m src.yt_audio_app "URL1" --session-id "user-123"
+python -m src.yt_video_app download "URL1" --session-id "user-123"
+python -m src.yt_transcript_app "URL1" --session-id "user-123"
 ```
 
 ## Troubleshooting
@@ -404,6 +582,7 @@ python -m src.yt_video_app config
 * **Audio quality** → Fixed at 192kbps MP3 (by design)
 * **Configuration** → No config files needed (hardcoded settings)
 * **Dependencies** → Only requires yt-dlp (no FFmpeg needed)
+* **Multiuser** → Use `--session-id` for user isolation
 
 ### Video App Specific
 
@@ -414,6 +593,24 @@ python -m src.yt_video_app config
 * **Force downloads** → Use `--force` flag to bypass file existence checks
 * **Feature flags** → Configure database integration and other features in `app_config.py`
 * **Multi-language** → System automatically creates unique filenames for different language combinations
+* **Multiuser** → Use `--session-id` for user isolation
+
+### Transcript App Specific
+
+* **Dependencies** → Requires `youtube-transcript-api` package
+* **Formats** → Choose from clean, timestamped, structured outputs
+* **Language detection** → Auto-detects available languages or specify with `--language`
+* **Metadata analysis** → Rich content analysis (disable with `--no-metadata`)
+* **Preview mode** → Use `--preview` to see content without downloading
+* **Multiuser** → Use `--session-id` for user isolation
+
+### Multiuser Specific
+
+* **Session management** → Each `--session-id` creates isolated user space
+* **Directory structure** → Downloads organized by session and video UUIDs
+* **Backward compatibility** → Works without `--session-id` (creates new session)
+* **Web integration** → Perfect for web app development
+* **No database** → Pure session-based approach
 
 ## Migration from Unified App
 
@@ -421,10 +618,13 @@ If you were using the previous unified app:
 
 1. **For audio downloads**: Use `yt_audio_app` instead of `--audio-only` flag
 2. **For video downloads**: Use `yt_video_app download` instead of the unified app
-3. **Configuration**: Video settings moved to `src/common/app_config.py`
-4. **CLI options**: Audio and video apps have separate, focused option sets
-5. **New features**: Language selection, force downloads, and feature flags are now available
-6. **Subcommands**: Video app now uses subcommands (`download`, `info`, `languages`, `formats`, `config`)
+3. **For transcript downloads**: Use `yt_transcript_app` (new feature)
+4. **Configuration**: Video settings moved to `src/common/app_config.py`
+5. **CLI options**: Audio, video, and transcript apps have separate, focused option sets
+6. **New features**: Language selection, force downloads, multiuser support, and feature flags
+7. **Subcommands**: Video app uses subcommands (`download`, `info`, `languages`, `formats`, `config`)
+8. **Multiuser support**: All apps now support `--session-id` for user isolation
+9. **Transcript support**: New transcript downloader with multiple format outputs
 
 ## License
 

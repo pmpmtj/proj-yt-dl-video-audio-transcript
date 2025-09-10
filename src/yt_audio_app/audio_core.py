@@ -17,6 +17,9 @@ from .audio_helpers import (
     validate_audio_url
 )
 
+# Import multiuser support
+from ..common.user_context import UserContext
+
 # Initialize logger for this module
 logger = logging.getLogger("audio_core")
 
@@ -122,7 +125,8 @@ def download_audio_mp3(url: str,
                       custom_download_path: Optional[str] = None,
                       progress_callback: Optional[Callable] = None,
                       downloader=None, 
-                      file_checker=None) -> str:
+                      file_checker=None,
+                      user_context: Optional[UserContext] = None) -> str:
     """
     Download best audio from YouTube URL as MP3.
     
@@ -139,6 +143,7 @@ def download_audio_mp3(url: str,
         progress_callback: Optional progress callback function
         downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
         file_checker: Function to check if file exists (defaults to os.path.exists)
+        user_context: User context for multiuser support (optional)
         
     Returns:
         Path to downloaded MP3 file
@@ -157,7 +162,11 @@ def download_audio_mp3(url: str,
     
     # Get output template
     if output_template is None:
-        output_template = get_audio_output_template(custom_download_path)
+        output_template = get_audio_output_template(
+            custom_download_path, 
+            user_context=user_context, 
+            video_url=url
+        )
         logger.debug(f"Using output template: {output_template}")
     
     # Set up dependencies

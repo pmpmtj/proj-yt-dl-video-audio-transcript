@@ -23,6 +23,9 @@ from .trans_core import (
 # Import transcript utilities
 from .get_transcript_list import print_and_select_default_transcript, print_transcript_preview
 
+# Import multiuser support
+from ..common.user_context import UserContext, create_user_context
+
 # Initialize logger for this module
 logger = logging.getLogger("trans_cli")
 
@@ -109,6 +112,11 @@ Examples:
         help='Suppress progress output'
     )
     
+    parser.add_argument(
+        '--session-id',
+        help='Session ID for multiuser support (creates new session if not provided)'
+    )
+    
     args = parser.parse_args()
     
     # Check if URL is provided (unless showing help or listing languages)
@@ -117,7 +125,8 @@ Examples:
     
     logger.info(f"Parsed arguments: URL={args.url}, output_dir={args.output_dir}, "
                f"template={args.template}, language={args.language}, formats={args.formats}, "
-               f"metadata={args.metadata}, preview={args.preview}, list_languages={args.list_languages}")
+               f"metadata={args.metadata}, preview={args.preview}, list_languages={args.list_languages}, "
+               f"session_id={args.session_id}")
     return args
 
 
@@ -130,7 +139,8 @@ class TranscriptCLIController:
                  transcript_downloader: Optional[Callable] = None,
                  metadata_extractor: Optional[Callable] = None,
                  preview_generator: Optional[Callable] = None,
-                 progress_hook: Optional[Callable] = None):
+                 progress_hook: Optional[Callable] = None,
+                 user_context: Optional[UserContext] = None):
         """
         Initialize transcript CLI controller with optional dependencies for testing.
         
@@ -139,11 +149,13 @@ class TranscriptCLIController:
             metadata_extractor: Function to extract metadata (defaults to get_transcript_metadata)
             preview_generator: Function to generate preview (defaults to preview_transcript)
             progress_hook: Progress callback function (defaults to default_transcript_progress_hook)
+            user_context: User context for multiuser support (optional)
         """
         self.transcript_downloader = transcript_downloader or download_transcript
         self.metadata_extractor = metadata_extractor or get_transcript_metadata
         self.preview_generator = preview_generator or preview_transcript
         self.progress_hook = progress_hook or default_transcript_progress_hook
+        self.user_context = user_context
     
     def handle_metadata_request(self, url: str) -> None:
         """
@@ -255,7 +267,7 @@ class TranscriptCLIController:
     def handle_transcript_download(self, url: str, language_code: Optional[str], 
                                  output_dir: Optional[str], template: Optional[str],
                                  formats: List[str], include_metadata: bool, 
-                                 quiet: bool) -> Dict[str, str]:
+                                 quiet: bool, session_id: Optional[str] = None) -> Dict[str, str]:
         """
         Handle transcript download workflow.
         
@@ -267,14 +279,31 @@ class TranscriptCLIController:
             formats: List of formats to generate
             include_metadata: Whether to include metadata analysis
             quiet: Whether to suppress progress output
+            session_id: Session ID for multiuser support
             
         Returns:
             Dictionary with format names as keys and file paths as values
         """
         logger.info("Handling transcript download request")
         
+        # Create or use user context for multiuser support
+        user_context = self.user_context
+        if session_id:
+            user_context = create_user_context(session_id)
+            logger.info(f"Using provided session ID: {session_id}")
+        elif not user_context:
+            user_context = create_user_context()
+            logger.info(f"Created new session: {user_context.get_session_id()}")
+        
         # Determine output template
-        if template:
+        if user_context and not template and not output_dir:
+            # Use multiuser path if user context available and no custom paths specified
+            from .trans_core import get_transcript_output_template
+            output_template = get_transcript_output_template(
+                user_context=user_context, 
+                video_url=url
+            )
+        elif template:
             # If custom template provided, combine with output directory
             if output_dir:
                 from path_utils.path_utils import resolve_path, ensure_directory, get_script_directories
@@ -304,7 +333,8 @@ class TranscriptCLIController:
             custom_download_path=output_dir,
             formats=formats,
             include_metadata=include_metadata,
-            progress_callback=progress_callback
+            progress_callback=progress_callback,
+            user_context=user_context
         )
         
         logger.info(f"Transcript download completed: {len(saved_files)} files saved")
@@ -348,7 +378,8 @@ class TranscriptCLIController:
                     args.template,
                     args.formats,
                     not args.no_metadata_analysis,
-                    args.quiet
+                    args.quiet,
+                    args.session_id
                 )
                 
                 print(f"\n✅ Transcript download completed successfully!")
@@ -370,6 +401,19 @@ class TranscriptCLIController:
                         print(f"\n📊 Metadata files:")
                         for file_path in existing_metadata:
                             print(f"   • {file_path}")
+                
+                # Show session ID if multiuser mode was used
+                if args.session_id or self.user_context:
+                    # Get the user context that was created in handle_transcript_download
+                    if args.session_id:
+                        current_user_context = create_user_context(args.session_id)
+                    elif self.user_context:
+                        current_user_context = self.user_context
+                    else:
+                        current_user_context = None
+                    
+                    if current_user_context:
+                        print(f"\n🔑 Session ID: {current_user_context.get_session_id()}")
                 
         except Exception as e:
             self.handle_download_error(e)
