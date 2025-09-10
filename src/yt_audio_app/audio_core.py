@@ -20,6 +20,13 @@ from .audio_helpers import (
 # Import multiuser support
 from ..common.user_context import UserContext
 
+# Import download monitoring
+import sys
+from pathlib import Path
+SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from download_monitor import DownloadResult, monitor_download
+
 # Initialize logger for this module
 logger = logging.getLogger("audio_core")
 
@@ -120,7 +127,7 @@ def perform_audio_download(ydl, url: str, expected_path: str, file_checker: Call
         return False
 
 
-def download_audio_mp3(url: str, 
+def _download_audio_mp3_internal(url: str, 
                       output_template: Optional[str] = None,
                       custom_download_path: Optional[str] = None,
                       progress_callback: Optional[Callable] = None,
@@ -193,6 +200,54 @@ def download_audio_mp3(url: str,
             return expected_path
         else:
             raise RuntimeError(f"Audio download failed - file not found: {expected_path}")
+
+
+def download_audio_mp3(url: str, 
+                      output_template: Optional[str] = None,
+                      custom_download_path: Optional[str] = None,
+                      progress_callback: Optional[Callable] = None,
+                      downloader=None, 
+                      file_checker=None,
+                      user_context: Optional[UserContext] = None) -> DownloadResult:
+    """
+    Download best audio from YouTube URL as MP3 with monitoring and return detailed status information.
+    
+    This is the public interface that wraps the internal download function
+    with monitoring capabilities to distinguish between actual downloads
+    and files that already exist.
+    
+    Args:
+        url: YouTube URL to download
+        output_template: Output template for filename (uses default if None)
+        custom_download_path: Custom download directory (uses default if None)
+        progress_callback: Optional progress callback function
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        file_checker: Function to check if file exists (defaults to os.path.exists)
+        user_context: User context for multiuser support (optional)
+        
+    Returns:
+        DownloadResult object with detailed status information
+        
+    Raises:
+        ValueError: If URL is invalid
+        RuntimeError: If download fails
+    """
+    logger.info(f"Starting monitored audio download for URL: {url}")
+    
+    # Use monitor_download to wrap the internal download function
+    result = monitor_download(
+        _download_audio_mp3_internal,
+        url=url,
+        output_template=output_template,
+        custom_download_path=custom_download_path,
+        progress_callback=progress_callback,
+        downloader=downloader,
+        file_checker=file_checker,
+        user_context=user_context
+    )
+    
+    logger.info(f"Audio download monitoring completed: {result.status}")
+    return result
 
 
 def get_audio_metadata(url: str, downloader=None) -> Dict[str, Any]:

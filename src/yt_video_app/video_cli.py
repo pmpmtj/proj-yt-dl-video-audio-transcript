@@ -200,7 +200,7 @@ class VideoCLIController:
                             restrict_filenames: bool, ext: str, quality: str,
                             audio_lang: str, subtitle_lang: Optional[str],
                             force: bool, config: Optional[Dict[str, Any]],
-                            session_id: Optional[str] = None) -> Optional[str]:
+                            session_id: Optional[str] = None):
         """Handle video download workflow.
         
         Args:
@@ -214,9 +214,6 @@ class VideoCLIController:
             force: Whether to force download even if file exists
             config: Configuration dictionary
             session_id: Session ID for multiuser support
-            
-        Returns:
-            Path to downloaded video file, or None if failed
         """
         logger.info("Starting video download")
         
@@ -229,7 +226,7 @@ class VideoCLIController:
             user_context = create_user_context()
             logger.info(f"Created new session: {user_context.get_session_id()}")
         
-        path = self.video_downloader(
+        result = self.video_downloader(
             url, 
             output_template, 
             restrict_filenames, 
@@ -242,8 +239,19 @@ class VideoCLIController:
             config=config,
             user_context=user_context
         )
-        logger.info(f"Video download completed: {path or 'failed'}")
-        return path
+        
+        # Handle the result based on status
+        if result.status == "downloaded":
+            logger.info(f"Video download completed: {result.path}")
+            print(f"Video download completed: {result.path}")
+        elif result.status == "already_exists":
+            logger.info(f"Video file already exists: {result.path}")
+            print(f"Video file already exists: {result.path}")
+        elif result.status == "failed":
+            logger.error(f"Video download failed: {result.message}")
+            print(f"Video download failed: {result.message}")
+        
+        return result
     
     def handle_download_error(self, error: Exception) -> None:
         """Handle download errors with appropriate logging and output.
@@ -385,7 +393,7 @@ class VideoCLIController:
                 )
                 logger.debug(f"Using output template: {output_template or 'default'}")
                 
-                path = self.handle_video_download(
+                result = self.handle_video_download(
                     args.url, 
                     output_template, 
                     args.restrict_filenames, 
@@ -397,7 +405,16 @@ class VideoCLIController:
                     config,
                     args.session_id
                 )
-                print(f"\nVideo download completed: {path or 'failed'}")
+                
+                # Display additional metadata if available
+                if result.metadata:
+                    if 'download_duration' in result.metadata:
+                        duration = result.metadata['download_duration']
+                        print(f"Download duration: {duration:.2f} seconds")
+                    if 'file_size' in result.metadata:
+                        size = result.metadata['file_size']
+                        print(f"File size: {size:,} bytes")
+                
                 if self.user_context or args.session_id:
                     print(f"Session ID: {self.user_context.get_session_id() if self.user_context else 'N/A'}")
                 

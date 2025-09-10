@@ -15,8 +15,7 @@ import yt_dlp
 from path_utils import load_config
 from .video_helpers import (
     get_default_video_settings, 
-    get_output_template_with_path,
-    get_downloads_directory
+    get_output_template_with_path
 )
 from ..common.app_config import (
     is_database_source_enabled,
@@ -25,6 +24,13 @@ from ..common.app_config import (
 
 # Import multiuser support
 from ..common.user_context import UserContext
+
+# Import download monitoring
+import sys
+from pathlib import Path
+SCRIPT_DIR = Path(__file__).resolve().parent.parent.parent
+sys.path.insert(0, str(SCRIPT_DIR))
+from download_monitor import DownloadResult, monitor_download
 
 # Initialize logger for this module
 logger = logging.getLogger("video_core")
@@ -115,8 +121,9 @@ def _get_video_download_settings(config: Dict[str, Any], outtmpl: Optional[str] 
     video_settings = get_default_video_settings(config)
     
     if outtmpl is None:
-        outtmpl = get_output_template_with_path(config)
-        logger.debug(f"Using output template: {outtmpl}")
+        # Use default template without path - path will be added later with multiuser logic
+        outtmpl = video_settings['output_template']
+        logger.debug(f"Using default template: {outtmpl}")
     
     if restrict is None:
         restrict = video_settings['restrict_filenames']
@@ -277,7 +284,7 @@ def _perform_download(ydl, url: str, expected_path: str, file_checker: Callable)
 
 # --- Core Download Functions --------------------------------------------------
 
-def download_video_with_audio(url: str, outtmpl: Optional[str] = None, 
+def _download_video_internal(url: str, outtmpl: Optional[str] = None, 
                             restrict: Optional[bool] = None, ext: Optional[str] = None, 
                             quality: Optional[str] = None, audio_lang: str = 'original',
                             subtitle_lang: Optional[str] = None, force: bool = False,
@@ -324,7 +331,7 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
     outtmpl, restrict, ext, quality = _get_video_download_settings(config, outtmpl, restrict, ext, quality)
     
     # Use multiuser path if user context provided
-    if user_context and outtmpl is None:
+    if user_context:
         outtmpl = get_output_template_with_path(config, user_context=user_context, video_url=url)
         logger.debug(f"Using multiuser output template: {outtmpl}")
     
@@ -364,6 +371,62 @@ def download_video_with_audio(url: str, outtmpl: Optional[str] = None,
         else:
             logger.error(f"Video download failed - file not found: {expected_path}")
             return None
+
+
+def download_video_with_audio(url: str, outtmpl: Optional[str] = None, 
+                            restrict: Optional[bool] = None, ext: Optional[str] = None, 
+                            quality: Optional[str] = None, audio_lang: str = 'original',
+                            subtitle_lang: Optional[str] = None, force: bool = False,
+                            progress_callback: Optional[Callable] = None,
+                            config: Optional[Dict[str, Any]] = None,
+                            downloader=None, file_checker=None,
+                            user_context: Optional[UserContext] = None) -> DownloadResult:
+    """Download video+audio with monitoring and return detailed status information.
+    
+    This is the public interface that wraps the internal download function
+    with monitoring capabilities to distinguish between actual downloads
+    and files that already exist.
+    
+    Args:
+        url: YouTube URL to download
+        outtmpl: Output template for filename (uses config default if None)
+        restrict: Whether to restrict filenames to ASCII (uses config default if None)
+        ext: Container extension ('mp4' or 'webm') (uses config default if None)
+        quality: Quality setting ('best' or height like '1080p') (uses config default if None)
+        audio_lang: Audio language code ('original' for default, or specific language code)
+        subtitle_lang: Subtitle language code to embed (optional)
+        force: Whether to force download even if file exists (skips file existence check)
+        progress_callback: Optional progress callback function
+        config: Configuration dictionary (loads from file if None)
+        downloader: yt-dlp downloader class (defaults to yt_dlp.YoutubeDL)
+        file_checker: Function to check if file exists (defaults to os.path.exists)
+        user_context: User context for multiuser support (optional)
+        
+    Returns:
+        DownloadResult object with detailed status information
+    """
+    logger.info(f"Starting monitored video download for URL: {url}")
+    
+    # Use monitor_download to wrap the internal download function
+    result = monitor_download(
+        _download_video_internal,
+        url=url,
+        outtmpl=outtmpl,
+        restrict=restrict,
+        ext=ext,
+        quality=quality,
+        audio_lang=audio_lang,
+        subtitle_lang=subtitle_lang,
+        force=force,
+        progress_callback=progress_callback,
+        config=config,
+        downloader=downloader,
+        file_checker=file_checker,
+        user_context=user_context
+    )
+    
+    logger.info(f"Video download monitoring completed: {result.status}")
+    return result
 
 
 # --- Metadata Parsing Functions -----------------------------------------------

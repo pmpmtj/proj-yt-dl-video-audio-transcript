@@ -147,7 +147,7 @@ class AudioCLIController:
     
     def handle_audio_download(self, url: str, output_dir: Optional[str], 
                             template: Optional[str], quiet: bool, 
-                            session_id: Optional[str] = None) -> str:
+                            session_id: Optional[str] = None):
         """
         Handle audio download workflow.
         
@@ -157,9 +157,6 @@ class AudioCLIController:
             template: Custom filename template
             quiet: Whether to suppress progress output
             session_id: Session ID for multiuser support
-            
-        Returns:
-            Path to downloaded audio file
         """
         logger.info("Handling audio download request")
         
@@ -203,15 +200,25 @@ class AudioCLIController:
         progress_callback = None if quiet else self.progress_hook
         
         # Perform download
-        path = self.audio_downloader(
+        result = self.audio_downloader(
             url,
             output_template=output_template,
             progress_callback=progress_callback,
             user_context=user_context
         )
         
-        logger.info(f"Audio download completed: {path}")
-        return path
+        # Handle the result based on status
+        if result.status == "downloaded":
+            logger.info(f"Audio download completed: {result.path}")
+            print(f"Audio download completed: {result.path}")
+        elif result.status == "already_exists":
+            logger.info(f"Audio file already exists: {result.path}")
+            print(f"Audio file already exists: {result.path}")
+        elif result.status == "failed":
+            logger.error(f"Audio download failed: {result.message}")
+            print(f"Audio download failed: {result.message}")
+        
+        return result
     
     def handle_download_error(self, error: Exception) -> None:
         """
@@ -240,14 +247,23 @@ class AudioCLIController:
             if args.metadata:
                 self.handle_metadata_request(args.url)
             else:
-                path = self.handle_audio_download(
+                result = self.handle_audio_download(
                     args.url,
                     args.output_dir,
                     args.template,
                     args.quiet,
                     args.session_id
                 )
-                print(f"\nAudio download completed: {path}")
+                
+                # Display additional metadata if available
+                if result.metadata:
+                    if 'download_duration' in result.metadata:
+                        duration = result.metadata['download_duration']
+                        print(f"Download duration: {duration:.2f} seconds")
+                    if 'file_size' in result.metadata:
+                        size = result.metadata['file_size']
+                        print(f"File size: {size:,} bytes")
+                
                 if self.user_context or args.session_id:
                     print(f"Session ID: {self.user_context.get_session_id() if self.user_context else 'N/A'}")
                 
