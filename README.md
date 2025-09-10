@@ -17,6 +17,10 @@ A modular YouTube downloader built on **yt-dlp** + **FFmpeg** with clean, produc
 ### Video Downloader (`yt_video_app`)
 - **Configurable Quality**: Choose from best, 2160p, 1440p, 1080p, 720p, 480p, 360p, 144p
 - **Multiple Formats**: MP4 and WebM container support
+- **Language Support**: Download with specific audio languages and embedded subtitles
+- **Multi-Language Downloads**: Download same video in different languages with unique filenames
+- **Force Downloads**: Bypass file existence checks with `--force` option
+- **Feature Flags**: Database-ready configuration for future scalability
 - **Container Compatibility**: Enforces container-compatible tracks to avoid FFmpeg errors
 - **Configuration-Driven**: Python-based configuration for easy customization
 - **Comprehensive Logging**: Centralized logging with hybrid approach
@@ -67,23 +71,44 @@ python -m src.yt_audio_app "URL" --quiet
 
 ### Video Downloader
 
-Download video with configurable quality and format:
+Download video with configurable quality, format, and language options:
 
 ```bash
 # Basic video download (using config defaults)
-python -m src.yt_video_app "https://www.youtube.com/watch?v=VIDEO_ID"
+python -m src.yt_video_app download "https://www.youtube.com/watch?v=VIDEO_ID"
 
 # Specific quality and format
-python -m src.yt_video_app "URL" --quality 1080p --ext mp4
+python -m src.yt_video_app download "URL" --quality 1080p --ext mp4
+
+# Download with specific audio language
+python -m src.yt_video_app download "URL" --audio-lang en --quality 720p
+
+# Download with audio language and subtitles
+python -m src.yt_video_app download "URL" --audio-lang en --subtitle-lang en
+
+# Force download even if file exists
+python -m src.yt_video_app download "URL" --force
 
 # Custom filename template
-python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
+python -m src.yt_video_app download "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
 
 # WebM format at 720p
-python -m src.yt_video_app "URL" --ext webm --quality 720p
+python -m src.yt_video_app download "URL" --ext webm --quality 720p
 
 # ASCII-only filenames (safer)
-python -m src.yt_video_app "URL" --restrict-filenames
+python -m src.yt_video_app download "URL" --restrict-filenames
+
+# Get video information without downloading
+python -m src.yt_video_app info "URL"
+
+# Check available languages
+python -m src.yt_video_app languages "URL"
+
+# Check available formats and qualities
+python -m src.yt_video_app formats "URL"
+
+# Show configuration and feature flags
+python -m src.yt_video_app config
 ```
 
 ### Command Line Options
@@ -95,12 +120,29 @@ python -m src.yt_video_app "URL" --restrict-filenames
 * `--metadata, -m` — show video metadata without downloading
 * `--quiet, -q` — suppress progress output
 
-#### Video Downloader Options
+#### Video Downloader Commands
+
+**Download Command:**
 * `url` *(positional)* — the video URL
 * `--output-template` — yt-dlp output template (default: from config)
 * `--restrict-filenames` — ASCII-only safe filenames
 * `--ext {mp4,webm}` — preferred output container (default: from config)
 * `--quality {best,2160p,1440p,1080p,720p,480p,360p,144p}` — video quality cap (default: from config)
+* `--audio-lang` — audio language code (default: original)
+* `--subtitle-lang` — subtitle language code to embed (optional)
+* `--force` — force download even if file exists
+
+**Info Command:**
+* `url` *(positional)* — the video URL
+
+**Languages Command:**
+* `url` *(positional)* — the video URL
+
+**Formats Command:**
+* `url` *(positional)* — the video URL
+
+**Config Command:**
+* `--feature-flags` — show only feature flags status
 
 ## Configuration
 
@@ -118,9 +160,58 @@ APP_CONFIG = {
         "quality": "best", 
         "output_template": "%(title)s.%(ext)s",
         "restrict_filenames": True
+    },
+    "features": {
+        "use_database_as_source": False,
+        "enable_file_existence_check": True,
+        "enable_metadata_caching": False,
+        "enable_download_history": False
     }
 }
 ```
+
+### Feature Flags
+
+The video downloader includes feature flags for future database integration:
+
+- **`use_database_as_source`**: When `True`, database becomes the single source of truth (always force downloads)
+- **`enable_file_existence_check`**: When `False`, skips file existence checks (always force downloads)
+- **`enable_metadata_caching`**: Future feature for metadata caching
+- **`enable_download_history`**: Future feature for download history tracking
+
+### Multi-Language Downloads
+
+The system automatically generates unique filenames for different language combinations:
+
+- **Original language**: `Video_Title.mp4`
+- **English audio**: `Video_Title_audio-en.mp4`
+- **Spanish audio**: `Video_Title_audio-es.mp4`
+- **English audio + subtitles**: `Video_Title_audio-en_sub-en.mp4`
+
+### Download Behavior Matrix
+
+The following table shows how different feature flags and CLI options determine download behavior:
+
+| `use_database_as_source` | `enable_file_existence_check` | `--force` CLI | File Exists | **Result** |
+|-------------------------|------------------------------|---------------|-------------|------------|
+| `True` | `True` | Not specified | Yes | **Force Download** (DB overrides) |
+| `True` | `True` | `--force` | Yes | **Force Download** (DB overrides) |
+| `True` | `True` | `--no-force` | Yes | **Force Download** (DB overrides) |
+| `True` | `False` | Not specified | Yes | **Force Download** (DB overrides) |
+| `False` | `True` | Not specified | Yes | **Skip Download** (file exists) |
+| `False` | `True` | `--force` | Yes | **Force Download** (CLI overrides) |
+| `False` | `True` | `--no-force` | Yes | **Skip Download** (explicit no-force) |
+| `False` | `False` | Not specified | Yes | **Force Download** (check disabled) |
+| `False` | `False` | `--force` | Yes | **Force Download** (check disabled) |
+| `False` | `False` | `--no-force` | Yes | **Skip Download** (explicit no-force) |
+| Any | Any | Any | No | **Download** (file doesn't exist) |
+
+**Key Behaviors:**
+- **Database Source (`use_database_as_source: True`)**: Always forces download regardless of file existence or CLI options
+- **File Check Disabled (`enable_file_existence_check: False`)**: Always forces download unless `--no-force` is explicitly used
+- **Normal Mode**: Respects file existence check and `--force` CLI option
+- **CLI Override**: `--force` always overrides file existence check in normal mode
+- **Explicit No-Force**: `--no-force` always skips download even when checks are disabled
 
 ### Audio Downloader Configuration
 
@@ -257,19 +348,45 @@ python -m src.yt_audio_app "URL" --metadata
 
 ```bash
 # Download best available quality (saves to downloads/video/)
-python -m src.yt_video_app "https://youtu.be/dQw4w9WgXcQ"
+python -m src.yt_video_app download "https://youtu.be/dQw4w9WgXcQ"
 
 # Download 1080p MP4
-python -m src.yt_video_app "URL" --quality 1080p --ext mp4
+python -m src.yt_video_app download "URL" --quality 1080p --ext mp4
+
+# Download with English audio
+python -m src.yt_video_app download "URL" --audio-lang en --quality 720p
+
+# Download with English audio and subtitles
+python -m src.yt_video_app download "URL" --audio-lang en --subtitle-lang en
+
+# Download same video in multiple languages
+python -m src.yt_video_app download "URL" --audio-lang en
+python -m src.yt_video_app download "URL" --audio-lang es
+python -m src.yt_video_app download "URL" --audio-lang fr
+
+# Force re-download even if file exists
+python -m src.yt_video_app download "URL" --force
 
 # Download 720p WebM
-python -m src.yt_video_app "URL" --quality 720p --ext webm
+python -m src.yt_video_app download "URL" --quality 720p --ext webm
 
 # Custom filename with uploader
-python -m src.yt_video_app "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
+python -m src.yt_video_app download "URL" --output-template "%(uploader)s - %(title)s.%(ext)s"
 
 # Safe ASCII-only filenames
-python -m src.yt_video_app "URL" --restrict-filenames
+python -m src.yt_video_app download "URL" --restrict-filenames
+
+# Check what languages are available
+python -m src.yt_video_app languages "URL"
+
+# Check what formats are available
+python -m src.yt_video_app formats "URL"
+
+# Get video information without downloading
+python -m src.yt_video_app info "URL"
+
+# Show current configuration
+python -m src.yt_video_app config
 ```
 
 ## Troubleshooting
@@ -293,15 +410,21 @@ python -m src.yt_video_app "URL" --restrict-filenames
 * **Configuration** → Edit `src/common/app_config.py` for default settings
 * **Quality options** → Use `--quality` flag to override config defaults
 * **Format options** → Use `--ext` flag to choose MP4 or WebM
+* **Language options** → Use `--audio-lang` and `--subtitle-lang` flags for language selection
+* **Force downloads** → Use `--force` flag to bypass file existence checks
+* **Feature flags** → Configure database integration and other features in `app_config.py`
+* **Multi-language** → System automatically creates unique filenames for different language combinations
 
 ## Migration from Unified App
 
 If you were using the previous unified app:
 
 1. **For audio downloads**: Use `yt_audio_app` instead of `--audio-only` flag
-2. **For video downloads**: Use `yt_video_app` instead of the unified app
+2. **For video downloads**: Use `yt_video_app download` instead of the unified app
 3. **Configuration**: Video settings moved to `src/common/app_config.py`
 4. **CLI options**: Audio and video apps have separate, focused option sets
+5. **New features**: Language selection, force downloads, and feature flags are now available
+6. **Subcommands**: Video app now uses subcommands (`download`, `info`, `languages`, `formats`, `config`)
 
 ## License
 
